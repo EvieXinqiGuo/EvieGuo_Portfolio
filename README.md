@@ -1,4 +1,4 @@
-# EvieGuo_Portfolio
+# EvieXinqiGuo_Portfolio
 
 # [Project 1: xxxx](https://)
 *
