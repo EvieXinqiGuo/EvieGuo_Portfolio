@@ -1,6 +1,8 @@
 # EvieXinqiGuo_Portfolio
 
-# all graphs and data presented are original data collected in my own studies.
+## all graphs and data presented are original data collected in my own graduate level studies. Please do not use the data or graphs without my consent. 
+
+
 # [Project 1:](https://)
 *
 *
