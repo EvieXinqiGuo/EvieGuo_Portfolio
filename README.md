@@ -1,7 +1,7 @@
 # EvieXinqiGuo_Portfolio
 
 ## all graphs and data presented are original data collected in my own graduate level studies. Please do not use the data or graphs without my consent. 
-
+## this is a portfolio in progress
 
 # [Project 1:](https://)
 *
