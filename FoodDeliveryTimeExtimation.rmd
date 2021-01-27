@@ -1,5 +1,5 @@
 ---
-title: "DoorDash Take-Home Exercise - Delivery Duration Prediction"
+title: "Food Delivery Duration Prediction"
 author: "Evie Xinqi Guo"
 output:
   html_document:
@@ -21,12 +21,12 @@ knitr::opts_chunk$set(echo=F,
                       tidy=TRUE)
 ```
 # Overview of the challenge
-![](/Users/guoxinqieve/Desktop/OutForDelivery.jpeg) 
-
-# DoorDash connects consumers with their favorite resturants through machine-learning-backed service. Once the order arrives late, the convinence due to delivery now becomes frustration.
+![](https://memegenerator.net/instance/59804661/kermit-looking-out-the-window-delivery-status-out-for-delivery) 
+# Background
+# A food delivery company connects consumers with their favorite resturants through machine-learning-backed service. Once the order arrives late, the convinence due to delivery now becomes frustration.
 # To ensure that the prediction of delivery time closely reflects the actual delivery time, information from the three sides involved - the store, the dashers' capacity, and the consumer's order - all needs to be taken into consideration.
 # Conceptually, the estimated delivery duration after the customer placing an order can be divided into these components (it's not necessarily a chain of events since some can be done in paralell): 
-- The time that a store takes to receive an order from DoorDash
+- The time that a store takes to receive an order from the company
 - The time for a store to repare for an order
 - Assigning the order to the right dasher
 - The dasher travels to the store
@@ -94,8 +94,8 @@ library(lubridate)
 Below, I am reading the csv's as dataframes into R.
 
 ```{r importing datasets}
-train_raw = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/historical_data.csv")
-test_raw =  read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/predict_data.csv")
+train_raw = read_csv("...")
+test_raw =  read_csv("...")
 ```
 
 #Pre-processing - data exploration, recoding, and cleaning
@@ -153,7 +153,7 @@ summary(train$actual_delivery_time) # actual_delivery_time has 7 NAs, other than
 table(train$store_primary_category) # some categories are much more popular than the others.
 
 
-# looking at the distribution of the means of how stores accpet DoorDash order
+# looking at the distribution of the means of how stores accpet an order from the delivery company's system
 table(train$order_protocol) # order_protocol has a lot of NAs, ranges from 1 to 7, are distinct, some are much more popular than others
 summary(train$order_protocol)
 
@@ -456,7 +456,7 @@ head(XGB_pred_submmit)
 sub_avg <- data.frame(delivery_id = test$delivery_id, 'predicted duration' = (2*XGB_pred_submmit+predict(lmer_model,newdata=test,  allow.new.levels=TRUE))/3)
 head(sub_avg)
 
-write.csv(sub_avg,"/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/XinqiGuo_DoorDashSubmission.csv", row.names = F)
+write.csv(sub_avg,"...", row.names = F)
 
 ```
 
