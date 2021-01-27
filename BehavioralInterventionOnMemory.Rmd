@@ -1,5 +1,5 @@
 ---
-title: "Dissertation Proposal"
+title: "Self-talk Intervention on Memory Performance in Children and Adults"
 output: html_document
 ---
 #Both
@@ -36,8 +36,8 @@ library(lubridate)
 #Both
 ```{r ImportDatasets, include=FALSE}
 #07272020 checked
-corpus_Win20_raw_after020720 <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_after 020720.csv")
-Corpus_spring20_raw <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_spring20.csv")
+corpus_Win20_raw_after020720 <- read_csv("...")
+Corpus_spring20_raw <- read_csv("...")
 ```
 #Both
 ```{r CleanRawData, include=FALSE}
@@ -486,9 +486,9 @@ WinSp20_combined$Activity = dplyr::recode(WinSp20_combined$Activity,
 #Both
 ```{r ImportPreSurvey, include=FALSE}
 #07272020 checked
-PreSurvey_Winter20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Winter20.csv")
+PreSurvey_Winter20_raw = read_csv("...")
 
-PreSurvey_Spring20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Spring20.csv")
+PreSurvey_Spring20_raw = read_csv("...")
 
 PreSurvey_WinSp20_raw = bind_rows(PreSurvey_Winter20_raw[-c(1:2),], PreSurvey_Spring20_raw[-c(1:2),])
 Demo_WinSp20 = PreSurvey_WinSp20_raw[, c("StudentID", "Age", "Gender", "Gender_3_TEXT", "Ethnoracial", "CollegeYear", "TransferStd", "Country_born", "Country_grown", "StateReside")]
@@ -497,8 +497,8 @@ Demo_WinSp20 = PreSurvey_WinSp20_raw[, c("StudentID", "Age", "Gender", "Gender_3
 ```{r ImportPID, include=FALSE}
 #07272020 checked
 
-PID_Match_Wi20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_after 020720.csv")[-c(1:3),c("Survey", "Question 5")]
-PID_Match_Sp20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_ 040820.csv")[-c(1:3),c("Survey", "Question 5")]
+PID_Match_Wi20 = read_csv("...")[-c(1:3),c("Survey", "Question 5")]
+PID_Match_Sp20 = read_csv("...")[-c(1:3),c("Survey", "Question 5")]
 
 PID_Match_Wi20 = add_column(PID_Match_Wi20,  season = "WI20", .before = "Survey")
 PID_Match_Sp20 = add_column(PID_Match_Sp20,  season = "SP20", .before = "Survey")
@@ -2094,12 +2094,12 @@ library(sjPlot)
 library(corrplot)
 
 # note that this dataset already no outlier # the outliers deleted in the Google Sheet were A15255117, A13397671, A13683711, A1560385
-PrivateSpeech_Adult_1106<- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/Data_Fall19_SONA_PS/19KD06_Adult.csv")
+PrivateSpeech_Adult_1106<- read_csv("...")
 
 PrivateSpeech_Adult_1106 = PrivateSpeech_Adult_1106[c(2:nrow(PrivateSpeech_Adult_1106)), 1:47] # getting rid of the top road and the columns after useful info.
 View(PrivateSpeech_Adult_1106)
 ## importing the PS content coding file 
-PS_coding_analysis <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_coding_analysis.csv")
+PS_coding_analysis <- read_csv("...")
 View(PS_coding_analysis)
 ```
 
@@ -2132,7 +2132,7 @@ PS_coding_analysis$PID = substr(PS_coding_analysis$PID, 2, 9)
 ```{r importing 021120 SONA, include=FALSE}
 #08022020 checked
 # the results showed that the trend is still fewer flips and longer time for the encouraged condition
-PS_SONA_021120_performance <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_SONA_021120_performance.csv")
+PS_SONA_021120_performance <- read_csv("...")
 
 highOL_time = print(PS_SONA_021120_performance$Time[PS_SONA_021120_performance$Time > (mean(PS_SONA_021120_performance$Time) + 3*sd(PS_SONA_021120_performance$Time))])
 
@@ -2154,7 +2154,7 @@ nrow(as.data.frame(unique(PS_SONA_021120_performance$ID)))
 # Study 2 in the proposal
 ```{r importing the 57 complete cases from piloting into the newer data, include=FALSE}
 # 08022020 checked
-SONAPilotingComplete <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/SONAPilotingComplete.csv")
+SONAPilotingComplete <- read_csv("...")
 nrow(SONAPilotingComplete)
 
 glimpse(SONAPilotingComplete)
@@ -2368,7 +2368,7 @@ Non_NegativeSubj = PS_coding_analysis %>%
  t.test(Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% NegativeSubj], Combined_Performance_coding$EF[Combined_Performance_coding$PID %in%Non_NegativeSubj])
  
  ## after recoding, the following ppts are evaluative, since they uttered something like "i'm an idiot", or "i'm better at this than i thought"
-Evaluative_full_PID <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/Data_Fall19_SONA_PS/EvaluativeSubjects.csv")
+Evaluative_full_PID <- read_csv("...")
 
 Recoded_evaluativeSubj= substr(Evaluative_full_PID$PID, 2, 9)
 
@@ -2432,7 +2432,7 @@ completeFun <- function(data, desiredCols) {
 ```
 # Study 2 in the proposal
 ```{r detecting outliers and analyzing ECEC performance, include = False}
-ecec_PS_performance <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/ecec_PS_performance.csv")  
+ecec_PS_performance <- read_csv("...")  
     # col_types = cols(DOB = col_date(format = "%m/%d/%Y"), 
      #    TIME = col_character()))
 
@@ -2466,7 +2466,7 @@ mean(ecec_PS_performance$Time[ecec_PS_performance$Condition=="E"]/ecec_PS_perfor
 # Study 2 in the proposal
 ```{r ECEC_coding_excel_similar_with_adults, include=FALSE}
 library(dplyr)
-ECEC_coding <- as.data.frame( read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/ECEC_coding.csv")[, 1:10]) %>% filter(!is.na(Name))
+ECEC_coding <- as.data.frame( read_csv("...")[, 1:10]) %>% filter(!is.na(Name))
 ECEC_coding[is.na(ECEC_coding)] <- 0
 glimpse(ECEC_coding)
 
@@ -3038,7 +3038,7 @@ anova(NullModel, ModelwithRate)
 
 ```{r FourConditions file and correcting the cells, include=FALSE}
 # including the dataset of 
-PS_4Conditions_SONA_Win20<- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_4Conditions_SONA_Win20.csv")
+PS_4Conditions_SONA_Win20<- read_csv("...")
 
 ### the current file is hms, should divide it by 60 to get minute and second
 PS_4Conditions_SONA_Win20 = PS_4Conditions_SONA_Win20  %>%
@@ -3087,7 +3087,7 @@ sum(results+0)
 ```
 
 ```{r include the easiness to be labelled, include=FALSE}
-EasinessLabel = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/HEAL - Help us find out how namable the stimuli are!_March 10, 2020_22.23.csv")
+EasinessLabel = read_csv("...")
 Numeric_EasinessLabel = EasinessLabel[sapply(EasinessLabel, class) == "numeric" ]
 
 testing = Numeric_EasinessLabel %>%
@@ -3107,7 +3107,7 @@ Numeric_EasinessLabel_separated = separate(data = as.data.frame(summary(Numeric_
 EasinessLabel_Mean = Numeric_EasinessLabel_separated %>%
   filter(`function` == "Mean   ")
 
-clustered_EasinessLabel = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/clustered_EasinessLabel.csv")
+clustered_EasinessLabel = read_csv("...")
 
 ## function, 1.table the respective colomn; 2. make the table result into dataframe; 3. extract the number of rows 3. attach the number of rows to the dataset
 
