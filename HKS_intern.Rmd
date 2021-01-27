@@ -1,0 +1,1805 @@
+---
+title: "Evie Project Example Walk Through for HKS"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+```{r knitr.global.options.TYT, include=F}
+knitr::opts_chunk$set(echo=F, 
+                      warning=F, 
+                      message = F,
+                      fig.align='center', 
+                      fig.pos='H',
+                      fig.width=12, 
+                      fig.height=8, 
+                      fig.path='Figs/', 
+                      tidy.opts=list(width.cutoff=60),
+                      tidy=TRUE)
+```
+
+# Overview
+  Why I think HKS should care: This study utilizes a new and robust method to assess well-being in a real-world setting, with a large sample size (Sample = 821; Prompts = 7357). Its method and insight could be generalized to assess experience in a built environments and transform them into happier places.
+
+## 1) Challenge
+- Lack of research on micro-level or momentary human experience
+- Past result of intervention on momentary well-being might be containminated by momentary valence-of-thought (e.g. the participants might be happy just because she's thinking about pleasant things that the moment, which is not due to the factor or intervention of interest)
+- A mind-wandering mind is an unhappy mind?
+  
+
+## 2) Aim
+- Use experience sampling method to study how momentary well-being is influenced by other subjective factors. 
+- Include a valence-of-thought question and later take it into control. Do a more robust assessment on the effect of attention state on momentary well-being by taking valence-of-thought into consideration.
+- Explore the effect of activity and other subjective experience on momentary well-being.
+
+
+
+## 3) Approach
+
+![](/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/1-27-20 without text explanation.png) 
+
+## 4) Method
+
+### Generalized linear mixed effect modeling 
+- Attention State (and Controllability, and their interaction) as the fixed effect(s)
+- Participant ID and their Current Activity are crossed random effects
+
+### Approach of reporting
+- Significance test of model comparison (a full model vs. a lesion model without the effect of interest)
+- Partial eta-square
+
+### Preparation before analysis:
+
+#### A. Importing R Libraries (Tools)
+```{r importing libraries}
+library(apa)
+library(citr)
+library(papaja)
+library(MOTE)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(dplyr)
+library(pwr)
+library(emmeans)
+library(sjPlot)
+library(effects)
+library(MuMIn)
+library(sjstats)
+library(gridExtra)
+library(grid)
+library(gtable)
+library(gplots)
+library(corrplot)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+```
+
+#### B. Importing raw datasets
+```{r ImportDatasets}
+#01122021 checked
+corpus_Win20_raw_after020720 <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_after 020720.csv")
+Corpus_spring20_raw <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_spring20.csv")
+```
+
+#### C. Cleaning raw datasets
+
+- For instance, exclude incomplete data, recoding chategorical data into numeric data.
+```{r CleanRawData}
+#01122021 checked
+
+# Build non-raw
+corpus_Win20_cleaned_after020720 = corpus_Win20_raw_after020720
+
+# change headers
+## after 020720file
+names(corpus_Win20_cleaned_after020720) <- as.matrix(corpus_Win20_cleaned_after020720[1, ])
+corpus_Win20_cleaned_after020720 <- corpus_Win20_cleaned_after020720[-1, ]
+corpus_Win20_cleaned_after020720[] <- lapply(corpus_Win20_cleaned_after020720, function(x) type.convert(as.character(x)))
+
+# clean the roles with "NA" column names
+## after 020720file
+corpus_Win20_cleaned_after020720  =  as.data.frame(corpus_Win20_cleaned_after020720[-c(1:2), -c(5:8)])
+
+# changing column names into something meaningful
+## after 020720 file
+colnames(corpus_Win20_cleaned_after020720) = c("Start Date",
+                                                "End Date",
+                                                "Time Scheduled",
+                                                "Duration (in seconds)",
+                                                "ID",
+                                                "Honest",
+                                                "Attention",
+                                                "Feeling_ZonedOut",
+                                                "Feeling_PandNP",
+                                                "SpeechNoSpeech",
+                                                "NatureIfNoSpeech",
+                                                "Clarity_Speech", 
+                                                "Control_Speech", 
+                                                "Valence_Speech",
+                                                "SpecifyNature", 
+                                                 "Clarity_NoSpeech", 
+                                                "Control_NoSpeech", 
+                                                "Valence_NoSpeech",
+                                                "Self_Speech",
+                                                "Temporal_Speech",
+                                                "Importance_Speech", 
+                                                "Reaction_Speech", 
+                                                "Activity")
+#internally label the Attention Statuses
+corpus_Win20_cleaned_after020720$Attention <- as.character(corpus_Win20_cleaned_after020720$Attention)
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="PRESENT: My attention WAS related to my current activity, immediate surroundings, or inner experience"] <- "AtPresent"
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="NOT PRESENT: My attention was NOT related to my current activity, immediate surroundings"] <- "NotPresent"
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="ZONED OUT: I was not paying attention to anything, with no inner speech and no inner experience"] <- "ZoneOut"
+
+## this outcomes are not numeric
+corpus_Win20_cleaned_after020720$Activity <- as.character(corpus_Win20_cleaned_after020720$Activity)
+corpus_Win20_cleaned_after020720$ID <- as.character(corpus_Win20_cleaned_after020720$ID)
+n.participants.Win20 <- length(unique(corpus_Win20_cleaned_after020720$ID)) # 380
+corpus_Win20_cleaned_after020720$Honest <- as.character(corpus_Win20_cleaned_after020720$Honest)
+
+n.completed.prompt.Win20 <- nrow(corpus_Win20_cleaned_after020720) ##5766 prompts were received
+
+#' this is the recode process for the subjective and objective valence of thought, which would be helpful to understand the extremeness of thought in a more intuitive way
+corpus_Win20_cleaned_after020720$Feeling_ZonedOut = dplyr::recode(corpus_Win20_cleaned_after020720$Feeling_ZonedOut,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+corpus_Win20_cleaned_after020720$Feeling_PandNP = dplyr::recode(corpus_Win20_cleaned_after020720$Feeling_PandNP,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+# coding the type of thoughts
+corpus_Win20_cleaned_after020720$SpeechNoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$SpeechNoSpeech,
+`INNER SPEECH: I was experiencing inner speech (talking to myself INTERNALLY)` = 'InnerSpeech',
+`NO SPEECH: I was NOT experiencing inner speech, or talking out loud to myself.` = 'NoSpeech',
+`THINK OUT LOUD: I was talking out loud to myself (talking to myself EXTERNALLY)` = 'ThinkOutLoud')
+
+
+corpus_Win20_cleaned_after020720$NatureIfNoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$NatureIfNoSpeech,
+`ANOTHER PERSON: I was experiencing another person, e.g. holding hands.` = "AnotherPerson",
+`BODY: I was experiencing body sensations, e.g. hunger.` = "Body",
+`EMOTION: I was experiencing emotions, e.g. sadness.` = "Emotion",
+`ENVIRONMENT: I was noticing the environment, e.g. looking at the trees.` = "Environment",
+`MUSIC/SOUNDS: I was listening to music/podcast, e.g. with my earphones in, or imagining music/sounds.` = "MusicOrSounds",
+`Other (click and specify)` = "Other",
+`VISUAL IMAGERY: I was experiencing visual imagery, e.g. imagining my dog.` = "VisualImagery")
+
+# recoding the text into numbers
+corpus_Win20_cleaned_after020720$Clarity_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Clarity_Speech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+corpus_Win20_cleaned_after020720$Control_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Control_Speech,     `NO: The inner/external speech I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in inner/external speech.` =  1 )                                                    
+corpus_Win20_cleaned_after020720$Valence_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Valence_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Clarity_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Clarity_NoSpeech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+corpus_Win20_cleaned_after020720$Control_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Control_NoSpeech,     `NO: The inner experience I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in my inner experience.` = 1)                                
+
+corpus_Win20_cleaned_after020720$Valence_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Valence_NoSpeech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Self_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Self_Speech, 
+`NO: For example, thinking/talking about other people I know or don't know, or thinking about something unrelated to others (e.g. wondering if it will rain).` = "NotSelf", 
+`YES: For example, analyzing myself, thinking/talking about getting something done, or thinking/talking about myself in relation to other people.` = "SelfRelated")
+
+corpus_Win20_cleaned_after020720$Importance_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Importance_Speech, 
+`1: Not at all important` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately important` = 4,
+`5` = 5,
+`6` = 6, 
+`7: Extremely important` = 7)
+
+corpus_Win20_cleaned_after020720$Reaction_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Reaction_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Temporal_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Temporal_Speech,
+`more than 1 year away in the past`  = -4,
+`between 1 month and 1 year in the past` =-3,
+`between yesterday and 1 month ago` =-2,
+`before in the present day` =-1,
+`present` =0,
+`later in the present day`= 1,
+`between tomorrow 1 month in the future` =2,
+`between 1 month and 1 year in the future` =3,
+`more than 1 year away in the future` =4,
+`no specific time` = NaN )
+
+# Build non-raw
+Corpus_spring20_cleaned = Corpus_spring20_raw
+
+# change headers
+
+## after 020720file
+names(Corpus_spring20_cleaned) <- as.matrix(Corpus_spring20_cleaned[1, ])
+Corpus_spring20_cleaned <- Corpus_spring20_cleaned[-1, ]
+Corpus_spring20_cleaned[] <- lapply(Corpus_spring20_cleaned, function(x) type.convert(as.character(x)))
+
+# clean the roles with "NA" column names
+## before 020720file
+Corpus_spring20_cleaned = as.data.frame(Corpus_spring20_cleaned[-c(1:2), -c(5:8)])
+
+# changing column names into something meaningful
+colnames(Corpus_spring20_cleaned) = c(          "Start Date",
+                                                "End Date",
+                                                "Time Scheduled",
+                                                "Duration (in seconds)",    
+                                                "ID",
+                                                "Honest",
+                                                "Attention",
+                                                "Feeling_ZonedOut",
+                                                "Feeling_PandNP",
+                                                "SpeechNoSpeech",
+                                                "NatureIfNoSpeech",
+                                                "Clarity_Speech", 
+                                                "Control_Speech", 
+                                                "Valence_Speech",
+                                                "SpecifyNature", 
+                                                 "Clarity_NoSpeech", 
+                                                "Control_NoSpeech", 
+                                                "Valence_NoSpeech",
+                                                "Self_Speech",
+                                                "Temporal_Speech",
+                                                "Importance_Speech", 
+                                                "Reaction_Speech", 
+                                                "Activity")
+
+#internally label the Attention Statuses
+Corpus_spring20_cleaned$Attention <- as.character(Corpus_spring20_cleaned$Attention)
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="PRESENT: My attention WAS related to my current activity, immediate surroundings, or inner experience"] <- "AtPresent"
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="NOT PRESENT: My attention was NOT related to my current activity, immediate surroundings"] <- "NotPresent"
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="ZONED OUT: I was not paying attention to anything, with no inner speech and no inner experience"] <- "ZoneOut"
+
+## this outcomes are not numeric
+Corpus_spring20_cleaned$Activity <- as.character(Corpus_spring20_cleaned$Activity)
+Corpus_spring20_cleaned$ID <- as.character(Corpus_spring20_cleaned$ID)
+n.participants.Win20 <- length(unique(Corpus_spring20_cleaned$ID)) # 421
+Corpus_spring20_cleaned$Honest <- as.character(Corpus_spring20_cleaned$Honest)
+
+n.completed.prompt.Win20 <- nrow(Corpus_spring20_cleaned) ## 6302 prompts were received
+
+#' this is the recode process for the subjective and objective valence of thought, which would be helpful to understand the extremeness of thought in a more intuitive way
+Corpus_spring20_cleaned$Feeling_ZonedOut = dplyr::recode(Corpus_spring20_cleaned$Feeling_ZonedOut,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+Corpus_spring20_cleaned$Feeling_PandNP = dplyr::recode(Corpus_spring20_cleaned$Feeling_PandNP,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+Corpus_spring20_cleaned$SpeechNoSpeech = dplyr::recode(Corpus_spring20_cleaned$SpeechNoSpeech,
+`INNER SPEECH: I was experiencing inner speech (talking to myself INTERNALLY)` = 'InnerSpeech',
+`NO SPEECH: I was NOT experiencing inner speech, or talking out loud to myself.` = 'NoSpeech',
+`THINK OUT LOUD: I was talking out loud to myself (talking to myself EXTERNALLY)` = 'ThinkOutLoud')
+
+
+Corpus_spring20_cleaned$NatureIfNoSpeech = dplyr::recode(Corpus_spring20_cleaned$NatureIfNoSpeech,
+`ANOTHER PERSON: I was experiencing another person, e.g. holding hands.` = 'AnotherPerson',
+`BODY: I was experiencing body sensations, e.g. hunger.` = 'Body',
+`EMOTION: I was experiencing emotions, e.g. sadness.` = 'Emotion',
+`ENVIRONMENT: I was noticing the environment, e.g. looking at the trees.` = 'Environment',
+`MUSIC/SOUNDS: I was listening to music/podcast, e.g. with my earphones in, or imagining music/sounds.` = 'MusicOrSounds',
+`Other (click and specify)` = 'Other',
+`VISUAL IMAGERY: I was experiencing visual imagery, e.g. imagining my dog.` = 'VisualImagery')
+
+
+Corpus_spring20_cleaned$Clarity_Speech = dplyr::recode(Corpus_spring20_cleaned$Clarity_Speech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+Corpus_spring20_cleaned$Control_Speech = dplyr::recode(Corpus_spring20_cleaned$Control_Speech,     `NO: The inner/external speech I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in inner/external speech.` =  1 )                                                    
+Corpus_spring20_cleaned$Valence_Speech = dplyr::recode(Corpus_spring20_cleaned$Valence_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Clarity_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Clarity_NoSpeech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+Corpus_spring20_cleaned$Control_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Control_NoSpeech,     `NO: The inner experience I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in my inner experience.` = 1)                                
+
+Corpus_spring20_cleaned$Valence_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Valence_NoSpeech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Self_Speech = dplyr::recode(Corpus_spring20_cleaned$Self_Speech, 
+`NO: For example, thinking/talking about other people I know or don't know, or thinking about something unrelated to others (e.g. wondering if it will rain).` = "NotSelf", 
+`YES: For example, analyzing myself, thinking/talking about getting something done, or thinking/talking about myself in relation to other people.` = "SelfRelated")
+
+Corpus_spring20_cleaned$Importance_Speech = dplyr::recode(Corpus_spring20_cleaned$Importance_Speech, 
+`1: Not at all important` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately important` = 4,
+`5` = 5,
+`6` = 6, 
+`7: Extremely important` = 7)
+
+Corpus_spring20_cleaned$Reaction_Speech = dplyr::recode(Corpus_spring20_cleaned$Reaction_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Temporal_Speech = dplyr::recode(Corpus_spring20_cleaned$Temporal_Speech,
+`more than 1 year away in the past`  = -4,
+`between 1 month and 1 year in the past` =-3,
+`between yesterday and 1 month ago` =-2,
+`before in the present day` =-1,
+`present` =0,
+`later in the present day`= 1,
+`between tomorrow 1 month in the future` =2,
+`between 1 month and 1 year in the future` =3,
+`more than 1 year away in the future` =4,
+`no specific time` = NaN )
+```
+
+#### D. Exluding suspicious participants from the dataset. The participants were suspicious if they fall into at least one of the following categories. 
+
+- Did not respond to at least 9 prompts.
+- Chose "Zoned-out" for too many times (three SDs above the mean).   
+
+```{r SuspiciousParticipant}
+#01122021 checked
+
+zoned.n.Win20 <- corpus_Win20_cleaned_after020720 %>%
+  group_by(ID, Attention) %>%
+  dplyr::summarize(zoned.n.Win20 = n()) %>%
+  filter(Attention== "ZoneOut")
+
+
+total.n.Win20 <- corpus_Win20_cleaned_after020720 %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarise(total.n.Win20 = n())
+zoned_total.n.Win20 = right_join( data.frame(zoned.n.Win20), data.frame(total.n.Win20), by = c("ID"))
+zoned_total.n.Win20[is.na(zoned_total.n.Win20)]  = 0
+### calculating the perscentage of zoned out for those who replied for at least once for zoned out
+zoned_total.n.Win20$prop.zoned.Win20 = zoned_total.n.Win20$zoned.n.Win20/zoned_total.n.Win20$total.n.Win20
+
+suspiciousSubj.Win20 = zoned_total.n.Win20 %>%
+  mutate(mean.p.Win20 = mean(prop.zoned.Win20)) %>%    # mean = 0.1773978, sd = 0.1745668
+  mutate(over = mean.p.Win20+3*sd(prop.zoned.Win20)) %>%
+  filter(prop.zoned.Win20>over) %>%
+  .$ID ## 6 suspicious participants ### Participant 11  Participant 265 Participant 318 Participant 421 Participant 458 Participant 8  
+WI20_Susbicious = length(suspiciousSubj.Win20)
+
+###filter out those who responded no MORE than 9 prompts, which means no more than half
+noResponseSub.Win20 = total.n.Win20$ID[total.n.Win20[, 2]<=9]
+
+
+badSubj.Win20 =c( as.character(noResponseSub.Win20), as.character(suspiciousSubj.Win20))
+WI20_FewPrompts = length(badSubj.Win20)## 76 participants were filtered out
+
+# filter out the bad subject(s)
+
+corpus_Win20_cleaned_after020720<- corpus_Win20_cleaned_after020720 %>%
+  filter(!ID %in% badSubj.Win20)
+N_WI20 = length(unique(corpus_Win20_cleaned_after020720$ID))### 380 after filtering
+##################
+zoned.n.spr20 <- Corpus_spring20_cleaned %>%
+  group_by(ID, Attention) %>%
+  dplyr::summarize(zoned.n.spr20 = n()) %>%
+  filter(Attention== "ZoneOut")
+
+
+total.n.spr20 <- Corpus_spring20_cleaned %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarize(total.n.spr20 = n())
+zoned_total.n.spr20 = right_join( data.frame(zoned.n.spr20), data.frame(total.n.spr20), by = c("ID"))
+zoned_total.n.spr20[is.na(zoned_total.n.spr20)]  = 0
+### calculating the perscentage of zoned out for those who replied for at least once for zoned out
+zoned_total.n.spr20$prop.zoned.spr20 = zoned_total.n.spr20$zoned.n.spr20/zoned_total.n.spr20$total.n.spr20
+
+suspiciousSubj.spr20 = zoned_total.n.spr20 %>%
+  mutate(mean.p.spr20 = mean(prop.zoned.spr20)) %>%    # mean = , sd = 
+  mutate(over = mean.p.spr20+3*sd(prop.zoned.spr20)) %>%
+  filter(prop.zoned.spr20>over) %>%
+  .$ID ## 6 suspicious participants ### Participant 103 Participant 325 Participant 47  Participant 520 Participant 69  Participant 71 
+SP20_Susbicious = length(suspiciousSubj.spr20)
+
+###filter out those who responded no MORE than 9 prompts, which means no more than half
+noResponseSub.spr20 = total.n.spr20$ID[total.n.spr20[, 2]<=9]
+
+
+badSubj.spr20 =c( as.character(noResponseSub.spr20), as.character(suspiciousSubj.spr20))
+SP20_FewPrompts = length(badSubj.spr20)## 80 participants were filtered out
+
+# filter out the bad subject(s)
+
+Corpus_spring20_cleaned<- Corpus_spring20_cleaned %>%
+  filter(!ID %in% badSubj.spr20)
+### 421 after filtering
+```
+
+```{r ImportCombinedCorpus}
+#01122021 checked
+
+corpus_Win20_cleaned <- corpus_Win20_cleaned_after020720
+
+corpus_Win20_cleaned = add_column(corpus_Win20_cleaned,  season = "WI20", .before = "ID")
+
+Corpus_spring20_cleaned = add_column(Corpus_spring20_cleaned,  season = "SP20", .before = "ID")
+
+WinSp20_combined = rbind(corpus_Win20_cleaned, Corpus_spring20_cleaned)
+
+NeedFilterOut = WinSp20_combined[(WinSp20_combined$Attention == "AtPresent" & WinSp20_combined$Temporal_Speech !=0), ] # excluding those who said "at-present" for Attention Status, but not "at the present moment" for Temporal Status
+
+WinSp20_combined = setdiff(WinSp20_combined, NeedFilterOut )
+
+WinSp20_combined = WinSp20_combined %>% unite("SeasonID", season:ID, remove = FALSE)
+
+N = length(unique(WinSp20_combined$SeasonID)) # 801
+
+WinSp20_combined = subset(WinSp20_combined, select=-c(season,ID))# getting rid of ID and season column here to prevent confusion
+
+WinSp20_combined$NatureIfNoSpeech = as.character(WinSp20_combined$NatureIfNoSpeech)
+WinSp20_combined$SpeechNoSpeech = as.character(WinSp20_combined$SpeechNoSpeech)
+
+WinSp20_combined = WinSp20_combined %>% mutate(FullModality  = ifelse(SpeechNoSpeech == "NoSpeech", NatureIfNoSpeech, SpeechNoSpeech))
+
+WinSp20_combined$`Duration (in seconds)` = as.numeric( WinSp20_combined$`Duration (in seconds)`)
+
+start = mdy_hm(WinSp20_combined$`Start Date`, tz = "UTC")
+end = mdy_hm(WinSp20_combined$`End Date`, tz = "UTC")
+time.interval <- start %--% end
+time.duration <- as.duration(time.interval)
+
+median_finish = median(time.duration)
+
+sent = sapply(strsplit(as.character(WinSp20_combined$`Time Scheduled`), " -"), "[", 1)
+wait.interval <- mdy_hm(sent, tz = "UTC") %--% start
+wait.duration <- as.duration(wait.interval)
+median_wait = median(wait.duration)
+mean_wait = mean(wait.duration)
+
+```
+
+
+```{r RecodingActivity}
+#01122021 checked
+WinSp20_combined$Activity = dplyr::recode(WinSp20_combined$Activity,
+                                         `Commuting as a passenger in a vehicle`="Commuting",
+                                     `Daily self-care (e.g., brushing teeth, combing hair, etc.)`="Self-care",
+                                     ` Working at a job` = "Job",
+                                     `Walking somewhere while using a cell phone` = "Walking with phone",
+                                     `Taking care of pets`= "Pet-related",
+                                     `Taking care of children` = "Children-related",
+                                     `Socializing, but not currently talking to another person (e.g. party, celebration, social gathering)` = "Socializing",
+                                     `Sensual/sexual relations with another person` = "Sensual/Sexual",
+                                     `Participating in online activities, unrelated to entertainment (e.g. computer, internet, email, social media)` = "Online (not entertainment)",
+                                     `Having a conversation with a person (in person or through a device)` = "Conversation or Texting", 
+                           `Entertainment (e.g., watching a movie, TV show, video game, live sports game, theatre) (13)` =  "Entertainment")
+```
+
+
+#### E. Combine the ESM data with Pre-ESM survey, which has the demographic information and trait-level happiness.
+```{r ImportPreSurvey}
+#01122021 checked
+PreSurvey_Winter20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Winter20.csv")
+
+PreSurvey_Spring20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Spring20.csv")
+
+PreSurvey_WinSp20_raw = bind_rows(PreSurvey_Winter20_raw[-c(1:2),], PreSurvey_Spring20_raw[-c(1:2),])
+Demo_WinSp20 = PreSurvey_WinSp20_raw[, c("StudentID", "Age", "Gender", "Gender_3_TEXT", "Ethnoracial", "CollegeYear", "TransferStd", "Country_born", "Country_grown", "StateReside")]
+```
+
+```{r ImportPID}
+#01122021 checked
+
+PID_Match_Wi20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_after 020720.csv")[-c(1:3),c("Survey", "Question 5")]
+PID_Match_Sp20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_ 040820.csv")[-c(1:3),c("Survey", "Question 5")]
+
+PID_Match_Wi20 = add_column(PID_Match_Wi20,  season = "WI20", .before = "Survey")
+PID_Match_Sp20 = add_column(PID_Match_Sp20,  season = "SP20", .before = "Survey")
+
+WinSp20_PID_match = bind_rows(PID_Match_Wi20, PID_Match_Sp20) %>% # combine winter and spring
+  unite("SeasonID", 1:2, na.rm = TRUE, remove = FALSE) # new column as more informative ID.
+
+```
+
+```{r BigDf_CorpusDemoMatch}
+#01122021 checked
+
+uniqueIDCorpus = as.data.frame(unique(WinSp20_combined$SeasonID))
+colnames(uniqueIDCorpus) = "SeasonID"
+MatchCorpus = left_join(uniqueIDCorpus,WinSp20_PID_match, by = "SeasonID")
+colnames(MatchCorpus)[colnames(MatchCorpus) =="Question 5"] = "StudentID"
+
+DemoMatchCorpus = left_join(Demo_WinSp20, MatchCorpus, by = "StudentID") %>%
+  filter(!is.na(SeasonID))
+DemoMatchCorpus = DemoMatchCorpus %>%
+  filter(is.na(Gender_3_TEXT)|Gender_3_TEXT!="testing")
+#length(unique(DemoMatchCorpus$SeasonID)) #here we only have the demo of 768 ppl, since some of them loss track during the process
+```
+
+## 5) Results
+
+#### Descriptive findings: 
+
+##### 5.1) How often do we pay attention to the here-and-now, not attending to the here-and-now, versus no thoughts at all during waking time? - More than half of our waking time are at-present, phew!
+```{r AttentionDistribution}
+#08252020 these are for excluding the social interaction, the lines below can be deleted, if we don;t want this exclusion
+testing = WinSp20_combined %>% filter(SpeechNoSpeech=="ThinkOutLoud" & Activity =="Conversation or Texting")
+testingBig = dplyr::setdiff(WinSp20_combined, testing)
+WinSp20_combined = testingBig
+
+#08012020 checked
+N_prompts = nrow(WinSp20_combined)
+## Attention distribution by participants
+# zoned-out
+zoned_combined_20  <- WinSp20_combined %>%  
+  group_by(SeasonID, Attention) %>%
+  dplyr::summarize(zoned_combined_20  = n()) %>%
+  filter(Attention =="ZoneOut") ## indicate number of zoned-out prompts that this is AFTER filtering out the suspicious participants, so should be different from zoned.n and total.n
+
+total_combined_20  <- WinSp20_combined %>%
+  group_by(SeasonID) %>%
+  dplyr::summarize(total_combined_20  = n())
+
+zoned_total_combined_20 = right_join( data.frame(zoned_combined_20), data.frame(total_combined_20 ), by = c("SeasonID")) 
+## at-present 
+present.n_combined_20 <- WinSp20_combined %>%
+  group_by(SeasonID , Attention ) %>%
+  dplyr::summarise(present.n_combined_20 = n()) %>%
+  filter(Attention == "AtPresent")
+
+present_total_combined_20  = right_join( data.frame(present.n_combined_20), data.frame(total_combined_20 ), by = c("SeasonID"))
+
+## not-present 
+
+MW.n_combined_20  <- WinSp20_combined %>%
+  group_by(SeasonID , Attention ) %>%
+  dplyr::summarize(MW.n_combined_20  = n()) %>%
+  filter(Attention  == "NotPresent")
+
+names(MW.n_combined_20 )[1] = "SeasonID"
+MW_total_combined_20  = right_join( data.frame(MW.n_combined_20 ), data.frame(total_combined_20 ), by = c("SeasonID"))
+
+### 
+a <-full_join(present_total_combined_20 , MW_total_combined_20 , by = c("SeasonID"))
+b <-full_join(a, zoned_total_combined_20, by = c("SeasonID")) 
+c <- b[, c("present.n_combined_20", "MW.n_combined_20", "zoned_combined_20", "total_combined_20", "SeasonID")]
+
+c[is.na(c)] <- 0
+
+c$present.prob_combined_20 = c$present.n_combined_20/c$total_combined_20 
+c$MW.prob_combined_20 = c$MW.n_combined_20 /c$total_combined_20 
+c$zoned.prob_combined_20 = c$zoned_combined_20 /c$total_combined_20 
+
+Present_Percentage = mean(c$present.prob_combined_20)*100 # 0.6657747
+
+NotPresent_Percentage = mean(c$MW.prob_combined_20)*100 # 0.1584458
+
+ZonedOut_Percentage = mean(c$zoned.prob_combined_20)*100 # 0.1757795
+
+sd_Present_prob_combined_20 = sd(c$present.prob_combined_20) *100
+
+sd_NP_prob_combined_20 = sd(c$MW.prob_combined_20) *100
+
+sd_Zoned_prob_combined_20 = sd(c$zoned.prob_combined_20) * 100
+
+d = as.data.frame(c[,1:3]) 
+
+Attention <-  as.data.frame(table(WinSp20_combined$Attention))
+
+# AveragePrompts = nrow(WinSp20_combined)/length(unique(WinSp20_combined$SeasonID))
+
+#chisq.test(
+ # c(mean(c$present.prob_combined_20)*AveragePrompts, mean(c$MW.prob_combined_20)*AveragePrompts, mean(c$zoned.prob_combined_20)*AveragePrompts), 
+#  p= c(1/3,1/3,1/3)) 
+
+# Chisqure = 6.1169, df = 2, p-value = 0.04696
+
+## changing the format of the data from wide to long => for plotting them in the attention distribution.
+AttentionProportion_w_to_L<- reshape(data= as.data.frame(c[,-c(1:4)]), idvar="SeasonID",
+                         varying = c("present.prob_combined_20","MW.prob_combined_20","zoned.prob_combined_20"),
+                         v.name=c("Prob.Attention"),
+                         times=c("present.prob_combined_20","MW.prob_combined_20","zoned.prob_combined_20"),
+                         new.row.names = 1:2403,
+                         direction="long")
+
+colnames(AttentionProportion_w_to_L)[2] = "Attention"
+
+
+AttentionProportion_w_to_L$Attention = dplyr::recode(AttentionProportion_w_to_L$Attention,
+'present.prob_combined_20' = "AtPresent", 'MW.prob_combined_20' = "NotPresent", 'zoned.prob_combined_20'="ZonedOut")
+
+
+AttentionDistribution <- ggplot(AttentionProportion_w_to_L, aes(x=Attention, y=Prob.Attention))+ geom_boxplot(fill='#E69F00')+xlab("Attention Status")+
+  ylab("")+ theme_bw() +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+AttentionDistribution
+```
+
+##### 5.2) If we are interested in the modalities of thought, we can further distribute the prompts based on attention state and modality. We can zoom in to focus on one modality (in this case, verbal thoughts) if that would deepen our understanding of something more specific. 
+```{r PieChartOfStatuses, include=FALSE}
+###
+AP_IS = WinSp20_combined %>%
+  filter(Attention =="AtPresent" & SpeechNoSpeech =="InnerSpeech") %>%
+  mutate(SixStatus = "Present w/ Inner-Speech") 
+
+NP_IS = WinSp20_combined %>%
+  filter(Attention =="NotPresent" & SpeechNoSpeech =="InnerSpeech") %>%
+  mutate(SixStatus = "Not-Present w/ Inner-Speech")
+
+AP_ES = WinSp20_combined %>%
+  filter(Attention =="AtPresent" & SpeechNoSpeech =="ThinkOutLoud") %>% # code changed here due to the decision of adding the two TOL categories
+  mutate(SixStatus = "Present w/ External-Speech") 
+
+NP_ES = WinSp20_combined %>%
+  filter(Attention =="NotPresent" & SpeechNoSpeech =="ThinkOutLoud") %>% # code changed here due to the decision of adding the two TOL categories
+  mutate(SixStatus = "Not-Present w/ External-Speech")
+
+AP_NO = WinSp20_combined %>% # code changed here due to the decision of adding the two TOL categories
+  filter(Attention =="AtPresent", (SpeechNoSpeech !="InnerSpeech" & SpeechNoSpeech !="ThinkOutLoud")) %>%
+  mutate(SixStatus = "At-Present w/o Inner-Speech")
+
+NP_NO = WinSp20_combined %>%# code changed here due to the decision of adding the two TOL categories
+  filter(Attention =="NotPresent", (SpeechNoSpeech !="InnerSpeech" & SpeechNoSpeech !="ThinkOutLoud")) %>%
+  mutate(SixStatus = "Not-Present w/o Inner-Speech")
+  
+ZonedOut = WinSp20_combined %>%
+  filter(Attention == "ZoneOut")
+ 
+# Pie Chart with Percentages
+slices <- c(nrow(NP_ES), nrow(NP_NO), nrow(AP_NO),nrow(NP_IS), nrow(AP_IS), nrow(AP_ES), nrow(ZonedOut)) 
+lbls <- c("Not-Present w/ Think Out Loud", "Not-Present No Speech", "At-Present No Speech", "Not-Present w/ Inner-Speech", "At-Present w/ Inner-Speech", "At-Present w/ Think Out Loud", "Zoned-Out")
+pct <- round(slices/sum(slices)*100, digits = 1)
+pct_Percentage = paste(pct,"%") 
+lbls <- paste(lbls, pct_Percentage, slices,sep="\n") # add percents to labels 
+InnerSpeechPercentage = sum(pct[3:4])  
+ pie(slices,labels = lbls, col=rainbow(length(lbls)),
+    main="")
+```
+
+
+```{r JustInnerSpeech, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(Attention == "ZoneOut"| SpeechNoSpeech == "InnerSpeech") # only obtaining Inner Speech modality
+```
+ 
+```{r TemporalDistanceHistogram, include=FALSE}
+NotPresentHistogram = ggplot(WinSp20_combined %>%
+          filter(Attention == "NotPresent" & !is.na(Temporal_Speech) ),  aes(x=Temporal_Speech))+
+  geom_histogram( stat = "count") + ggtitle("ThinkOutLoud & AtPresent")+
+  theme(axis.text.x = element_text(size  = 10,angle = 45,hjust = 1, vjust = 1))+
+  labs(x="Temporal Distance", y="Frequency in Not-Present Prompts", title="")
+```
+
+
+```{r ActivityPlot, include=FALSE}
+WinSp20_combined$Feeling_PandNP[is.na(WinSp20_combined$Feeling_PandNP)] =0
+WinSp20_combined$Feeling_ZonedOut[is.na(WinSp20_combined$Feeling_ZonedOut)] =0
+
+WinSp20_combined = WinSp20_combined %>%
+  mutate(Feeling = Feeling_PandNP+Feeling_ZonedOut)
+
+ActivityMFeel_WISP20 = WinSp20_combined %>% 
+  group_by(Activity) %>%
+  dplyr::summarise(Activity_Feeling = mean(Feeling, na.rm = T))
+
+Activity_Freq_wiSP20 <- data.frame(table(WinSp20_combined$Activity))
+names(Activity_Freq_wiSP20)[1] = "Activity"
+
+foractivity_WISP20 = left_join(Activity_Freq_wiSP20, ActivityMFeel_WISP20, by = "Activity")
+
+foractivity_WISP20= foractivity_WISP20[order(foractivity_WISP20$Activity_Feeling), ]
+names(foractivity_WISP20) = c("Activity", "Frequency", "Feeling" )
+
+Activity_Point_WISP20 = ggplot(foractivity_WISP20, aes(x = reorder(Activity, Feeling), y = Feeling)) + 
+  geom_point(colour = 'lightblue', size=foractivity_WISP20$Frequency/75 )+
+  expand_limits(y=c(-3,3))+
+  theme(axis.text.x = element_text(size  = 10,angle = 45,hjust = 1, vjust = 1))+
+  labs(x="Activity", y="Feeling", title="")+
+  geom_text(aes(label=as.character(Frequency)), size=3, nudge_x=0.0, nudge_y=-0.15)
+
+WB_activity_range = max(foractivity_WISP20$Feeling) - min(foractivity_WISP20$Feeling)
+##############
+AttentionMFeel_WISP20 = WinSp20_combined %>% 
+  group_by(Attention) %>%
+  dplyr::summarise(Attention_Feeling = mean(Feeling, na.rm = T))
+
+Attention_Freq_wiSP20 <- data.frame(table(WinSp20_combined$Attention))
+names(Attention_Freq_wiSP20)[1] = "Attention"
+
+forAttention_WISP20 = left_join(Attention_Freq_wiSP20, AttentionMFeel_WISP20, by = "Attention")
+
+forAttention_WISP20= forAttention_WISP20[order(forAttention_WISP20$Attention_Feeling), ]
+names(forAttention_WISP20) = c("Attention", "Frequency", "Feeling" )
+
+Attention_Point_WISP20 = ggplot(forAttention_WISP20, aes(x = reorder(Attention, Feeling), y = Feeling)) + geom_point(colour = 'lightblue', size= forAttention_WISP20$Frequency/75 ) +
+  expand_limits(y=c(-3,3)) +
+  labs(x="Attention Status",
+      y="Momentary Well-being", title="") +
+  geom_text(aes(label=as.character(Frequency)), size=5, nudge_x=0.0, nudge_y=-0.15)+
+  theme(axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=10),
+        axis.title=element_text(size=14,face="bold"))
+
+WB_attention_range = max(forAttention_WISP20$Feeling) - min(forAttention_WISP20$Feeling)
+
+# activity Distribution across Attention Statuses
+Activity3states = chisq.test(table(WinSp20_combined$Attention, WinSp20_combined$Activity))
+
+NO_Zoned = WinSp20_combined %>%
+  filter(Attention != "ZoneOut")
+NO_NP = WinSp20_combined %>%
+  filter(Attention != "NotPresent")
+NO_AP = WinSp20_combined %>%
+  filter(Attention != "AtPresent")
+
+ActivityAPNP = chisq.test(table(NO_Zoned$Attention, NO_Zoned$Activity))
+
+ActivityZonedAP = chisq.test(table(NO_NP$Attention, NO_NP$Activity))
+
+ActivityZonedNP = chisq.test(table(NO_AP$Attention, NO_AP$Activity))
+```
+
+##### 5.3) Does attention state matter more to momentary well-being or current activity? - Hmmm, the descriptive result votes activity as a stronger influence than attention states.
+
+###### 5.3.1) Visualize the range of well-being as a function of activity
+```{r Activity_Point_WISP20}
+Activity_Point_WISP20
+```
+
+###### 5.3.2) Visualize the range of well-being as a function of attention state
+```{r Attention_Point_WISP20}
+Attention_Point_WISP20
+```
+
+###### 5.3.3) Does attention state contribute to well-being over-and-beyond the pleasantness of thought? - Yes!
+```{r status_activity_distribution, include=FALSE}
+status_activity_for_plot <- WinSp20_combined %>%
+  group_by(Attention, Activity) %>%
+  dplyr::summarise(n = n())
+intent_activity.plot <- ggplot(data = WinSp20_combined, aes(x = Attention,y =n)) +geom_bar(data = status_activity_for_plot, aes(fill= as.factor(Activity)), position="fill", stat  = "identity",color="white")+  theme(axis.text=element_text(size=14,face="bold"),
+        axis.title=element_text(size=14,face="bold"))
+##
+dt <-table(WinSp20_combined$Activity, WinSp20_combined$Attention)
+balloonplot(t(dt), main ="Activity Distribution As a Function of Attention", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+
+chisq <- chisq.test(dt)
+
+corrplot::corrplot(chisq$residuals, is.cor = FALSE)
+
+## testing if the mean of the two distributions are the same
+t.test(foractivity_WISP20$Feeling, forAttention_WISP20$Feeling)
+
+## testing if the variance of the two distributions are the same
+sd(foractivity_WISP20$Feeling)
+sd(forAttention_WISP20$Feeling)
+
+```
+ 
+```{r ZonedOutFeelingEstimationA, include=FALSE}
+Feeling_PandNP = as.data.frame( WinSp20_combined[, c("SeasonID", "Activity", "Attention", "Feeling_PandNP")] ) %>%
+  filter(!is.na(Feeling_PandNP))
+
+Feeling_ZonedOut = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "Feeling_ZonedOut")]) %>%
+  filter(!is.na(Feeling_ZonedOut))
+
+colnames(Feeling_PandNP)[4] = "Feeling"
+
+colnames(Feeling_ZonedOut)[4] = "Feeling"
+
+Feeling_combined = bind_rows(Feeling_PandNP, Feeling_ZonedOut)
+
+Feeling_Null_Speech = lmer(data= Feeling_combined,  Feeling~ 1  + (1|SeasonID)+ (1|Activity))
+```
+
+```{r ZonedOutFeelingEstimationB, include=FALSE}
+# there was a warning that the model doesn't converge. The optimizer was changed based on the suggestions here: https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html
+ss <- getME(Feeling_Null_Speech,c("theta","fixef"))
+Feeling_Null_Speech <- update(Feeling_Null_Speech,start=ss,control=lmerControl(optimizer="bobyqa",
+                            optCtrl=list(maxfun=2e5)))
+
+# this model now includes attention when predicting feeling
+Attention_Feeling_Speech = lmer(data= Feeling_combined,  Feeling~ 1  +Attention+ (1|SeasonID)+ (1|Activity))
+
+AttentionOnFeeling = anova(Feeling_Null_Speech, Attention_Feeling_Speech) # 247.25      2  < 2.2e-16 *** 
+#it performs the Chi-square test to compare the two models (i.e. it tests whether reduction in the residual sum of squares are statistically significant or not
+
+emmean_AttentionFeeling =  as.data.frame(emmeans(Attention_Feeling_Speech,  "Attention"))
+
+emmeancomparison_AttentionFeeling = as.data.frame(pairs(emmeans(Attention_Feeling_Speech,  "Attention")))
+
+x_Feeling_attention <- emmip(Attention_Feeling_Speech, ~Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Feeling", main="Feeling by Attention")
+
+Z_Feeling_attention= x_Feeling_attention+ theme_bw() + scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ ylim( c(-3, 3)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+NO_Zoned = WinSp20_combined %>%
+  filter(!Attention == "ZoneOut")
+```
+
+```{r ZonedOutFeelingEstimationC, include=FALSE}
+# this model includes valence when predicting feeling
+NO_Zoned_Valence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 +Valence_Speech + (1|SeasonID)+ (1|Activity))
+ss1 <- getME(NO_Zoned_Valence,c("theta","fixef"))
+NO_Zoned_Valence <- update(NO_Zoned_Valence,start=ss1,control=lmerControl(optimizer="bobyqa",
+                            optCtrl=list(maxfun=2e5)))
+```
+
+```{r ZonedOutFeelingEstimationD, include=FALSE}
+# this model investigates if attention can predict feeling over-any-beyond the influence of valence on feeling.
+NO_Zoned_AttentionValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 +Valence_Speech +Attention+ (1|SeasonID)+ (1|Activity))
+ss2 <- getME(NO_Zoned_AttentionValence,c("theta","fixef"))
+NO_Zoned_AttentionValence <- update(NO_Zoned_AttentionValence,start=ss2,control=lmerControl(optimizer="bobyqa",
+                            optCtrl=list(maxfun=2e5)))
+```
+
+```{r ZonedOutFeelingEstimationE, include=FALSE}
+AttentionOnTopValence = anova(NO_Zoned_Valence, NO_Zoned_AttentionValence)
+NO_Zoned_AttentionXValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 +Valence_Speech * Attention+ (1|SeasonID)+ (1|Activity))
+AttentionInteractValence = anova(NO_Zoned_AttentionXValence, NO_Zoned_AttentionValence)
+
+emmeancomparison_NO_Zoned_AttentionXValence = as.data.frame(pairs(emmeans(NO_Zoned_AttentionXValence,  "Attention")))
+
+AttentionInteractValence_pval = as.numeric(AttentionInteractValence$`Pr(>Chisq)`[2])
+
+NO_Zoned_AttentionXValence.rg = ref_grid(NO_Zoned_AttentionXValence, at = list(Valence_Speech = c(-3, -2, -1, 0, 1, 2, 3)))
+
+AttentionInteractValenceOnFeeling_plot <- emmip(NO_Zoned_AttentionXValence.rg, Attention ~Valence_Speech , CIs = TRUE, type="response", xlab = "Valence", ylab = "Feeling", main="")+ 
+  theme_bw() +aes(linetype = Attention) +
+  ylim(c(-3, 3)) +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+##### This is another way to look at the relationship among Attention, Valence and Feeling. It might be true that Attention predicts greater feeling, but this relationship is mediated by Valence. 
+AttentionValenceOverLappingOrNot = ggplot(data = NO_Zoned, aes(x = Valence_Speech, y = Feeling, fill = Attention)) +
+  geom_point(alpha = 1/4, position = "jitter", aes(color = Attention)) +
+  geom_abline()
+
+
+AttentionFirst = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 + Attention+ (1|SeasonID)+ (1|Activity))
+
+AttentionPlusValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 + Attention+Valence_Speech + (1|SeasonID)+ (1|Activity))
+
+AttentionXValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 + Attention*Valence_Speech + (1|SeasonID)+ (1|Activity))
+
+AttentionPredictValence = lmer(data = NO_Zoned, Valence_Speech~ 1+ Attention + (1|SeasonID)+ (1|Activity) )
+
+
+model.0 <- lm(Feeling_PandNP ~ Attention, NO_Zoned)
+summary(model.0)
+model.M <- lm(Valence_Speech ~ Attention, NO_Zoned)
+summary(model.M)
+model.Y <- lm(Feeling_PandNP ~ Attention + Valence_Speech, NO_Zoned)
+summary(model.Y)
+library(mediation)
+results <- mediate(model.M, model.Y, treat='Attention', mediator='Valence_Speech',
+                   boot=TRUE, sims=500)
+summary(results)
+
+
+#med.out = mediate(AttentionPredictValence, AttentionPlusValence, treat="Attention", mediator="Valence_Speech")
+#print(summary(med.out))
+```
+ 
+```{r ControlAsReactor_AttentionPreditor, include=FALSE}
+Control_Null = glmer(data = WinSp20_combined, 
+                     Control_Speech ~ 1+ (1|SeasonID) + (1|Activity),family = binomial )
+
+Control_Attention = glmer(data = WinSp20_combined, Control_Speech ~ 1+Attention+ (1|SeasonID) + (1|Activity), family = binomial )
+
+AttentionOnControl = anova(Control_Null,Control_Attention)
+
+RAttentionOnControl = r.squaredGLMM(Control_Attention)[1] - r.squaredGLMM(Control_Null)[1]
+
+```
+
+```{r LookingAtControlAndValence, include=FALSE}
+# use control, valence, and their interaction term as predictors for feeling
+NO_Zoned$Control_Speech = as.factor(NO_Zoned$Control_Speech)
+NO_Zoned$Control_Speech <- recode(NO_Zoned$Control_Speech, `1` = "Control", `0` = "Spontaneous")
+
+NO_Zoned_ControlValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 +Valence_Speech +Control_Speech+ (1|SeasonID)+ (1|Activity))
+ss2 <- getME(NO_Zoned_ControlValence,c("theta","fixef"))
+NO_Zoned_ControlValence <- update(NO_Zoned_ControlValence,start=ss2,control=lmerControl(optimizer="bobyqa",
+                            optCtrl=list(maxfun=2e5)))
+
+ControlOnTopValence = anova(NO_Zoned_Valence, NO_Zoned_ControlValence)
+NO_Zoned_ControlXValence = lmer(data= NO_Zoned,  Feeling_PandNP~ 1 +Valence_Speech * Control_Speech+ (1|SeasonID)+ (1|Activity))
+ControlInteractValence = anova(NO_Zoned_ControlXValence, NO_Zoned_ControlValence)
+
+emmeancomparison_NO_Zoned_ControlXValence = as.data.frame(pairs(emmeans(NO_Zoned_ControlXValence,  "Control_Speech")))
+
+
+ControlInteractValence_pval = as.numeric(ControlInteractValence$`Pr(>Chisq)`[2])
+
+NO_Zoned_ControlXValence.rg = ref_grid(NO_Zoned_ControlXValence, at = list(Valence_Speech = c(-3, -2, -1, 0, 1, 2, 3)))
+
+ControlInteractValenceOnFeeling_plot <- emmip(NO_Zoned_ControlXValence.rg, Control_Speech ~ Valence_Speech, CIs = TRUE, type="response", xlab = "Control", ylab = "Feeling", main="")+ 
+  theme_bw()+ aes(linetype = Control_Speech) +
+  ylim(c(-3, 3)) +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+
+```{r AttentionInteractValenceOnFeeling_plot}
+AttentionInteractValenceOnFeeling_plot
+```
+
+```{r AttentionControllabilityAsPredictor_clarity, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_clarity = lmer(data = WinSp20_combined, Clarity_Speech ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+
+emmean_AttentionXControl_clarity =  as.data.frame(emmeans(fullAttentionXControl_clarity,  "Attention"))
+
+emmeancomparison_AttentionXControl_clarity = as.data.frame(pairs(emmeans(fullAttentionXControl_clarity,  "Attention")))
+
+emmean_AttentionXControl_clarity_control =  as.data.frame(emmeans(fullAttentionXControl_clarity,  "Control"))
+
+emmeancomparison_AttentionXControl_clarity_control = as.data.frame(pairs(emmeans(fullAttentionXControl_clarity,  "Control")))
+
+
+ModelComparisonMainAttention_ClarityNoCovarite = anova(NoAttentionXControl_clarity, justAttentionXControl_clarity) # 303.02      2  < 2.2e-16 ***
+
+ModelComparisonMainControl_ClarityNoCovarite = anova(justAttentionXControl_clarity,plusAttentionXControl_clarity) # 238.65      1  < 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ClarityNoCovarite = anova(plusAttentionXControl_clarity, fullAttentionXControl_clarity) # 2.5737      1     0.1087
+
+# R for attention effect
+RMainAttention_ClarityNoCovarite = r.squaredGLMM(NoAttentionXControl_clarity)[1] - r.squaredGLMM(justAttentionXControl_clarity)[1]
+# R for Control type effect
+RMainControl_ClarityNoCovarite = r.squaredGLMM(justAttentionXControl_clarity)[1] - r.squaredGLMM(plusAttentionXControl_clarity)[1]
+ #R for interaction effect
+RAttentionxControl_ClarityNoCovarite = r.squaredGLMM(fullAttentionXControl_clarity)[1] - r.squaredGLMM(plusAttentionXControl_clarity)[1]
+# partial eta square
+PartialEta2AttentionxControl_ClarityNoCovarite = eta_sq(fullAttentionXControl_clarity, partial = TRUE)
+
+x_clarity_AttentionXControl <- emmip(fullAttentionXControl_clarity, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Clarity", main="Clarity by Control and Attention")
+
+Z_clarity_AttentionXControl = x_clarity_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r AttentionControllabilityAsPredict_Valence, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Valence =  lmer(data = WinSp20_combined, Valence_Speech ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Valence =  lmer(data = WinSp20_combined, Valence_Speech ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Valence =  lmer(data = WinSp20_combined, Valence_Speech ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Valence = lmer(data = WinSp20_combined, Valence_Speech ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+emmean_AttentionXControl_Valence =  as.data.frame(emmeans(fullAttentionXControl_Valence,  "Attention"))
+
+emmeancomparison_AttentionXControl_Valence = as.data.frame(pairs(emmeans(fullAttentionXControl_Valence,  "Attention")))
+
+emmean_AttentionXControl_Valence_control =  as.data.frame(emmeans(fullAttentionXControl_Valence,  "Control"))
+
+emmeancomparison_AttentionXControl_Valence_control = as.data.frame(pairs(emmeans(fullAttentionXControl_Valence,  "Control")))
+
+ModelComparisonMainAttention_ValenceNoCovarite = anova(NoAttentionXControl_Valence, justAttentionXControl_Valence) #
+
+ModelComparisonMainControl_ValenceNoCovarite = anova(plusAttentionXControl_Valence,justAttentionXControl_Valence) #  107.69      1  < 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ValenceNoCovarite = anova(plusAttentionXControl_Valence, fullAttentionXControl_Valence) # 1.1799      1     0.2774
+
+# R for attention effect
+RMainAttention_ValenceNoCovarite = r.squaredGLMM(justAttentionXControl_Valence)[1] - r.squaredGLMM(NoAttentionXControl_Valence)[1] 
+# R for Experience type effect
+RMainControl_ValenceNoCovarite = r.squaredGLMM(plusAttentionXControl_Valence)[1] - r.squaredGLMM(justAttentionXControl_Valence)[1] 
+ #R for interaction effect
+RAttentionxControl_ValenceNoCovarite = r.squaredGLMM(fullAttentionXControl_Valence)[1] - r.squaredGLMM(plusAttentionXControl_Valence)[1]
+# partial eta square
+PartialEta2AttentionxControl_ValenceNoCovarite = eta_sq(fullAttentionXControl_Valence, partial = TRUE)
+
+x_Valence_AttentionXControl <- emmip(fullAttentionXControl_Valence, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Valence", main="Valence by Control and Attention")
+
+Z_Valence_AttentionXControl = x_Valence_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r AttentionControllaiilityAsPredict_Feeling, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Feeling = lmer(data = WinSp20_combined, Feeling_PandNP ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+emmean_AttentionXControl_Feeling =  as.data.frame(emmeans(fullAttentionXControl_Feeling,  "Attention"))
+
+emmeancomparison_AttentionXControl_Feeling = as.data.frame(pairs(emmeans(fullAttentionXControl_Feeling,  "Attention")))
+
+emmean_AttentionXControl_Feeling_control =  as.data.frame(emmeans(fullAttentionXControl_Feeling,  "Control"))
+
+emmeancomparison_AttentionXControl_Feeling_control = as.data.frame(pairs(emmeans(fullAttentionXControl_Feeling,  "Control")))
+
+
+ModelComparisonMainAttention_FeelingNoCovarite = anova(NoAttentionXControl_Feeling, justAttentionXControl_Feeling) # 193.01      2  < 2.2e-16 ***
+
+ModelComparisonMainControl_FeelingNoCovarite = anova(plusAttentionXControl_Feeling,justAttentionXControl_Feeling) # 67.438      1  < 2.2e-16 ***
+
+ ModelComparisonAttentionxControl_FeelingNoCovarite = anova(plusAttentionXControl_Feeling, fullAttentionXControl_Feeling) #  0.0071      1     0.9329
+
+# R for attention effect
+RMainAttention_FeelingNoCovarite =   r.squaredGLMM(justAttentionXControl_Feeling)[1] - r.squaredGLMM(NoAttentionXControl_Feeling)[1]
+# R for Experience type effect
+RMainControl_FeelingNoCovarite = r.squaredGLMM(plusAttentionXControl_Feeling)[1] -  r.squaredGLMM(justAttentionXControl_Feeling)[1]
+ #R for interaction effect
+RAttentionxControl_FeelingNoCovarite = r.squaredGLMM(fullAttentionXControl_Feeling)[1] - r.squaredGLMM(plusAttentionXControl_Feeling)[1]
+# partial eta square
+PartialEta2AttentionxControl_FeelingNoCovarite = eta_sq(fullAttentionXControl_Feeling, partial = TRUE)
+
+x_Feeling_AttentionXControl <- emmip(fullAttentionXControl_Feeling, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Feeling", main="Feeling by Control and Attention")
+
+Z_Feeling_AttentionXControl = x_Feeling_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r AttentionControllabilityPredict_Self, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Self_Speech = as.factor(WinSp20_combined$Self_Speech)
+
+NoAttentionXControl_Self =  glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Self =  lmer(data = WinSp20_combined,family = binomial(), Self_Speech ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Self =  glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Self = glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+emmean_AttentionXControl_Self =  as.data.frame(emmeans(fullAttentionXControl_Self,  "Attention"))
+emmeancomparison_AttentionXControl_Self = as.data.frame(pairs(emmeans(fullAttentionXControl_Self,  "Attention")))
+
+emmean_AttentionXControl_Self_control =  as.data.frame(emmeans(fullAttentionXControl_Self,  "Control"))
+emmeancomparison_AttentionXControl_Self_control = as.data.frame(pairs(emmeans(fullAttentionXControl_Self,  "Control")))
+
+ModelComparisonMainAttention_SelfNoCovarite = anova(NoAttentionXControl_Self, justAttentionXControl_Self) #  48.283      2  3.278e-11 ***
+
+ModelComparisonMainControl_SelfNoCovarite = anova(plusAttentionXControl_Self,justAttentionXControl_Self) #  47.164      1  6.528e-12 ***
+
+ModelComparisonAttentionxControl_SelfNoCovarite = anova(plusAttentionXControl_Self, fullAttentionXControl_Self) #   1.2926      1     0.2556
+
+# R for attention effect
+RMainAttention_SelfNoCovarite = r.squaredGLMM(justAttentionXControl_Self)[1] - r.squaredGLMM(NoAttentionXControl_Self)[1]
+# R for Experience type effect
+RMainControl_SelfNoCovarite = r.squaredGLMM(plusAttentionXControl_Self)[1] -  r.squaredGLMM(justAttentionXControl_Self)[1]
+ #R for interaction effect
+RAttentionxControl_SelfNoCovarite = r.squaredGLMM(fullAttentionXControl_Self)[1] - r.squaredGLMM(plusAttentionXControl_Self)[1]
+# partial eta square
+PartialEta2AttentionxControl_SelfNoCovarite = eta_sq(fullAttentionXControl_Self, partial = TRUE)
+
+x_Self_AttentionXControl <- emmip(fullAttentionXControl_Self, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Self", main="Self by Control and Attention")
+
+Z_Self_AttentionXControl = x_Self_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+```
+ 
+```{r AttentionControllabilityPredict_Importance, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Importance = lmer(data = WinSp20_combined, Importance_Speech ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+emmean_AttentionXControl_Importance=  as.data.frame(emmeans(fullAttentionXControl_Importance,  "Attention"))
+emmeancomparison_AttentionXControl_Importance = as.data.frame(pairs(emmeans(fullAttentionXControl_Importance,  "Attention")))
+
+ModelComparisonMainAttention_ImportanceNoCovarite = anova(NoAttentionXControl_Importance, justAttentionXControl_Importance) #84.906      2  < 2.2e-16 ***
+
+ModelComparisonMainControl_ImportanceNoCovarite = anova(plusAttentionXControl_Importance,justAttentionXControl_Importance) # 82.599      1  < 2.2e-16 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ImportanceNoCovarite = anova(plusAttentionXControl_Importance, fullAttentionXControl_Importance) # 4.6842      1    0.03044 *
+
+# R for attention effect
+RMainAttention_ImportanceNoCovarite = r.squaredGLMM(justAttentionXControl_Importance)[1] - r.squaredGLMM(NoAttentionXControl_Importance)[1]
+# R for Experience type effect
+RMainControl_ImportanceNoCovarite = r.squaredGLMM(plusAttentionXControl_Importance)[1] - r.squaredGLMM(justAttentionXControl_Importance)[1]
+ #R for interaction effect
+RAttentionxControl_ImportanceNoCovarite = r.squaredGLMM(fullAttentionXControl_Importance)[1] - r.squaredGLMM(plusAttentionXControl_Importance)[1]
+# partial eta square
+PartialEta2AttentionxControl_ImportanceNoCovarite = eta_sq(fullAttentionXControl_Importance, partial = TRUE)
+
+x_Importance_AttentionXControl <- emmip(fullAttentionXControl_Importance, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Importance", main="Importance by Control and Attention")
+
+Z_Importance_AttentionXControl = x_Importance_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+
+emmean_AttentionXControl_Importance =  as.data.frame(emmeans(fullAttentionXControl_Importance,  "Attention"))
+
+emmeancomparison_AttentionXControl_Importance = as.data.frame(pairs(emmeans(fullAttentionXControl_Importance,  "Attention")))
+
+emmean_AttentionXControl_Importance_control =  as.data.frame(emmeans(fullAttentionXControl_Importance,  "Control"))
+
+emmeancomparison_AttentionXControl_Importance_control = as.data.frame(pairs(emmeans(fullAttentionXControl_Importance,  "Control")))
+
+
+```
+
+```{r AttentionControllabilityPredict_Reaction, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~ 1+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Reaction = lmer(data = WinSp20_combined, Reaction_Speech ~ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+emmean_AttentionXControl_Reaction =  as.data.frame(emmeans(fullAttentionXControl_Reaction,  "Attention"))
+emmeancomparison_AttentionXControl_Reaction = as.data.frame(pairs(emmeans(fullAttentionXControl_Reaction,  "Attention")))
+
+emmean_AttentionXControl_Reaction_control =  as.data.frame(emmeans(fullAttentionXControl_Reaction,  "Control"))
+
+emmeancomparison_AttentionXControl_Reaction_control = as.data.frame(pairs(emmeans(fullAttentionXControl_Reaction,  "Control")))
+
+
+ModelComparisonMainAttention_ReactionNoCovarite = anova(NoAttentionXControl_Reaction, justAttentionXControl_Reaction) #91.891      1  < 2.2e-16 ***
+
+ModelComparisonMainControl_ReactionNoCovarite = anova(plusAttentionXControl_Reaction,justAttentionXControl_Reaction) # 91.202      1  < 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ReactionNoCovarite = anova(plusAttentionXControl_Reaction, fullAttentionXControl_Reaction) # 0.2415      1     0.6231
+
+# R for attention effect
+RMainAttention_ReactionNoCovarite = r.squaredGLMM(justAttentionXControl_Reaction)[1] - r.squaredGLMM(NoAttentionXControl_Reaction)[1]
+# R for Experience type effect
+RMainControl_ReactionNoCovarite = r.squaredGLMM(plusAttentionXControl_Reaction)[1] - r.squaredGLMM(justAttentionXControl_Reaction)[1]
+ #R for interaction effect
+RAttentionxControl_ReactionNoCovarite = r.squaredGLMM(fullAttentionXControl_Reaction)[1] - r.squaredGLMM(plusAttentionXControl_Reaction)[1]
+# partial eta square
+PartialEta2AttentionxControl_ReactionNoCovarite = eta_sq(fullAttentionXControl_Reaction, partial = TRUE)
+
+x_Reaction_AttentionXControl <- emmip(fullAttentionXControl_Reaction, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Reaction", main="Reaction by Control and Attention")
+
+Z_Reaction_AttentionXControl = x_Reaction_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+``` 
+ 
+```{r ValenceCovariate_AttentionControllabilityAsPredictor_clarity, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~Valence_Speech+  Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_clarity =  lmer(data = WinSp20_combined, Clarity_Speech ~Valence_Speech+  Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_clarity = lmer(data = WinSp20_combined, Clarity_Speech ~ Valence_Speech+ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+ModelComparisonMainAttention_ClarityWithCovariate = anova(NoAttentionXControl_clarity, justAttentionXControl_clarity) #216.48      2  < 2.2e-16
+
+ModelComparisonMainControl_ClarityWithCovariate = anova(plusAttentionXControl_clarity,justAttentionXControl_clarity) # 184.25      1  < 2.2e-16
+
+ModelComparisonAttentionxControl_ClarityWithCovariate = anova(plusAttentionXControl_clarity, fullAttentionXControl_clarity) # 2.0367      1     0.1535
+
+# R for attention effect
+RMainAttention_ValenceWithCovariate = r.squaredGLMM(justAttentionXControl_clarity)[1] - r.squaredGLMM(NoAttentionXControl_clarity)[1]
+# R for Experience type effect
+RMainControl_ValenceWithCovariate = r.squaredGLMM(plusAttentionXControl_clarity)[1] - r.squaredGLMM(justAttentionXControl_clarity)[1] 
+ #R for interaction effect
+RAttentionxControl_ValenceWithCovariate = r.squaredGLMM(fullAttentionXControl_clarity)[1] - r.squaredGLMM(plusAttentionXControl_clarity)[1]
+# partial eta square
+PartialEta2AttentionxControl_ClarityWithCovariate = eta_sq(fullAttentionXControl_clarity, partial = TRUE)
+
+x_clarity_AttentionXControl <- emmip(fullAttentionXControl_clarity, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Clarity", main="Clarity by Control and Attention")
+
+Z_clarity_AttentionXControl = x_clarity_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r ValenceCovariate_AttentionControllaiilityAsPredict_Feeling, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+ModelComparisonMainAttention_FeelingWithCovariate = NoAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+ justAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~ Valence_Speech+Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Feeling =  lmer(data = WinSp20_combined, Feeling_PandNP ~Valence_Speech+ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Feeling = lmer(data = WinSp20_combined, Feeling_PandNP ~Valence_Speech+ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+ModelComparisonMainAttention_FeelingWithCovariate = anova(NoAttentionXControl_Feeling, justAttentionXControl_Feeling) # 36.522      2  1.173e-08 ***
+
+ModelComparisonMainControl_FeelingWithCovariate = anova(plusAttentionXControl_Feeling,justAttentionXControl_Feeling) # 4.387      1    0.03621 *
+
+ModelComparisonAttentionxControl_FeelingWithCovariate = anova(plusAttentionXControl_Feeling, fullAttentionXControl_Feeling) # 0.9198      1     0.3375
+
+# R for attention effect
+RMainAttention_FeelingWithCovariate = r.squaredGLMM(justAttentionXControl_Feeling)[1] - r.squaredGLMM(NoAttentionXControl_Feeling)[1]
+# R for Experience type effect
+RMainControl_FeelingWithCovariate = r.squaredGLMM(plusAttentionXControl_Feeling)[1] -  r.squaredGLMM(justAttentionXControl_Feeling)[1]
+ #R for interaction effect
+RAttentionxControl_FeelingWithCovariate = r.squaredGLMM(fullAttentionXControl_Feeling)[1] - r.squaredGLMM(plusAttentionXControl_Feeling)[1]
+# partial eta square
+PartialEta2AttentionxControl_FeelingWithCovariate = eta_sq(fullAttentionXControl_Feeling, partial = TRUE)
+
+x_Feeling_AttentionXControl <- emmip(fullAttentionXControl_Feeling, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Feeling", main="Feeling by Control and Attention")
+
+Z_Feeling_AttentionXControl = x_Feeling_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r ValenceCovariate_AttentionControllabilityPredict_Self, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Self_Speech = as.factor(WinSp20_combined$Self_Speech)
+
+NoAttentionXControl_Self =  glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Self =  glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~Valence_Speech+ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Self =  glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~Valence_Speech+ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Self = glmer(data = WinSp20_combined,family = binomial(), Self_Speech ~Valence_Speech+ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+ModelComparisonMainAttention_SelfWithCovariate = anova(NoAttentionXControl_Self, justAttentionXControl_Self) # 46.123      2  9.649e-11 ***
+
+ModelComparisonMainControl_SelfWithCovariate = anova(plusAttentionXControl_Self,justAttentionXControl_Self) #  45.459      1  1.559e-11 ***
+
+ModelComparisonAttentionxControl_SelfWithCovariate = anova(plusAttentionXControl_Self, fullAttentionXControl_Self) #  1.2905      1      0.256
+
+# R for attention effect
+RMainAttention_SelfWithCovariate = r.squaredGLMM(justAttentionXControl_Self)[1] -r.squaredGLMM(NoAttentionXControl_Self)[1]
+# R for Experience type effect
+RMainControl_SelfWithCovariate = r.squaredGLMM(plusAttentionXControl_Self)[1]- r.squaredGLMM(justAttentionXControl_Self)[1] 
+ #R for interaction effect
+RAttentionxControl_SelfWithCovariate = r.squaredGLMM(fullAttentionXControl_Self)[1] - r.squaredGLMM(plusAttentionXControl_Self)[1]
+# partial eta square
+PartialEta2AttentionxControl_SelfWithCovariate = eta_sq(fullAttentionXControl_Self, partial = TRUE)
+
+x_Self_AttentionXControl <- emmip(fullAttentionXControl_Self, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Self", main="Self by Control and Attention")
+
+Z_Self_AttentionXControl = x_Self_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 3)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r ValenceCovariate_AttentionControllabilityPredict_Importance, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~Valence_Speech+ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Importance =  lmer(data = WinSp20_combined, Importance_Speech ~Valence_Speech+ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Importance = lmer(data = WinSp20_combined, Importance_Speech ~Valence_Speech+ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+ModelComparisonMainAttention_ImportanceWithCovariate = anova(NoAttentionXControl_Importance, justAttentionXControl_Importance) # 76.766      2  < 2.2e-16 ***
+
+ModelComparisonMainControl_ImportanceWithCovariate = anova(plusAttentionXControl_Importance,justAttentionXControl_Importance) # 75.817      1  < 2.2e-16 *** 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ImportanceWithCovariate = anova(plusAttentionXControl_Importance, fullAttentionXControl_Importance) # 4.5761      1    0.03242 *
+
+# R for attention effect
+RMainAttention_ImportanceWithCovariate = r.squaredGLMM(justAttentionXControl_Importance)[1] - r.squaredGLMM(NoAttentionXControl_Importance)[1]
+# R for Experience type effect
+RMainControl_ImportanceWithCovariate = r.squaredGLMM(plusAttentionXControl_Importance)[1] - r.squaredGLMM(justAttentionXControl_Importance)[1] 
+ #R for interaction effect
+RAttentionxControl_ImportanceWithCovariate = r.squaredGLMM(fullAttentionXControl_Importance)[1] - r.squaredGLMM(plusAttentionXControl_Importance)[1]
+# partial eta square
+PartialEta2AttentionxControl_ImportanceWithCovariate = eta_sq(fullAttentionXControl_Importance, partial = TRUE)
+
+x_Importance_AttentionXControl <- emmip(fullAttentionXControl_Importance, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Importance", main="Importance by Control and Attention")
+
+Z_Importance_AttentionXControl = x_Importance_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+ 
+```{r ValenceCovariate_AttentionControllabilityPredict_Reaction, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(!Attention =="ZoneOut")
+WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+    `1` = "Control", `0` = "Spontaneous")
+WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+NoAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+justAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~Valence_Speech+ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+plusAttentionXControl_Reaction =  lmer(data = WinSp20_combined, Reaction_Speech ~Valence_Speech+ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+fullAttentionXControl_Reaction = lmer(data = WinSp20_combined, Reaction_Speech ~Valence_Speech+ Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+ModelComparisonMainAttention_ReactionWithCovariate = anova(NoAttentionXControl_Reaction, justAttentionXControl_Reaction) # 76.766      2  < 2.2e-16 ***
+
+ModelComparisonMainControl_ReactionWithCovariate = anova(plusAttentionXControl_Reaction,justAttentionXControl_Reaction) # 75.817      1  < 2.2e-16 *** 2.2e-16 ***
+
+ModelComparisonAttentionxControl_ReactionWithCovariate = anova(plusAttentionXControl_Reaction, fullAttentionXControl_Reaction) # 4.5761      1    0.03242 *
+
+# R for attention effect
+RMainAttention_ReactionWithCovariate = r.squaredGLMM(justAttentionXControl_Reaction)[1] - r.squaredGLMM(NoAttentionXControl_Reaction)[1]
+# R for Experience type effect
+RMainControl_ReactionWithCovariate = r.squaredGLMM(plusAttentionXControl_Reaction)[1] - r.squaredGLMM(justAttentionXControl_Reaction)[1] 
+ #R for interaction effect
+RAttentionxControl_ReactionWithCovariate = r.squaredGLMM(fullAttentionXControl_Reaction)[1] - r.squaredGLMM(plusAttentionXControl_Reaction)[1]
+# partial eta square
+PartialEta2AttentionxControl_ReactionWithCovariate = eta_sq(fullAttentionXControl_Reaction, partial = TRUE)
+
+x_Reaction_AttentionXControl <- emmip(fullAttentionXControl_Reaction, Control ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Reaction", main="Reaction by Control and Attention")
+
+Z_Reaction_AttentionXControl = x_Reaction_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(-3, 4)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+
+```{r ValenceCovariate_AttentionControllabilityPredict_Temporal, include=FALSE}
+#WinSp20_combined = WinSp20_combined %>%
+#  filter(!Attention =="ZoneOut")
+#WinSp20_combined$Control <- recode(WinSp20_combined$Control_Speech ,
+ #   `1` = "Control", `0` = "Spontaneous")
+#WinSp20_combined$Control = as.factor(WinSp20_combined$Control)
+
+#NoAttentionXControl_Temporal =  lmer(data = WinSp20_combined, Temporal_Speech ~ Valence_Speech+ (1|Activity)+ (1|SeasonID) ) 
+
+#justAttentionXControl_Temporal =  lmer(data = WinSp20_combined, Temporal_Speech ~ Valence_Speech+ Attention + (1|Activity)+ (1|SeasonID) ) 
+
+#plusAttentionXControl_Temporal =  lmer(data = WinSp20_combined, Temporal_Speech ~ Valence_Speech+ Attention + Control+ (1|Activity)+ (1|SeasonID) ) 
+
+#fullAttentionXControl_Temporal = lmer(data = WinSp20_combined, Temporal_Speech ~  Valence_Speech+Attention * Control+ (1|Activity)+ (1|SeasonID) ) 
+
+#anova(NoAttentionXControl_Temporal, plusAttentionXControl_Temporal) #61.83      2  3.747e-14 ***
+
+#anova(plusAttentionXControl_Temporal,justAttentionXControl_Temporal) #  0.0714      1     0.7893
+
+#anova(plusAttentionXControl_Temporal, fullAttentionXControl_Temporal) #  3.6036      1    0.05766 .
+# R for attention effect
+#r.squaredGLMM(NoAttentionXControl_Temporal)[1] - r.squaredGLMM(justAttentionXControl_Temporal)[1]
+# R for Experience type effect
+# r.squaredGLMM(justAttentionXControl_Temporal)[1] - r.squaredGLMM(plusAttentionXControl_Temporal)[1]
+#R for interaction effect
+#r.squaredGLMM(fullAttentionXControl_Temporal)[1] - r.squaredGLMM(plusAttentionXControl_Temporal)[1]
+# partial eta square
+#eta_sq(fullAttentionXControl_Temporal, partial = TRUE)
+
+#x_Temporal_AttentionXControl <- emmip(fullAttentionXControl_Temporal, Control ~  Attention,  CIs = TRUE, type="response", 
+ #   xlab = "Attention", ylab = "Temporal", main="Temporal by Control and Attention")
+
+#Z_Temporal_AttentionXControl = x_Temporal_AttentionXControl+ theme_bw() +aes(linetype = Control, shape = Control, color = Control)+ scale_color_manual( values=c("red", "blue") )+ylim(c(1, 10)) +theme(axis.text=element_text(size=12),
+ #       axis.title=element_text(size=14,face="bold"))
+
+ # Temporal_Control_AtPresent = ggplot(WinSp20_combined %>%
+  #        filter(Control =="Control" & Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+ # geom_histogram(binwidth = 1) + ggtitle("ThinkOutLoud & AtPresent")
+  
+#Temporal_Control_NotPresent=  ggplot(WinSp20_combined %>%
+#          filter(Control =="Control" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+#  geom_histogram(binwidth = 1)+ ggtitle("ThinkOutLoud & NotPresent")
+  
+#Temporal_Spontaneous_AtPresent=   ggplot(WinSp20_combined %>%
+#          filter(Control =="Spontaneous"& Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+#  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & AtPresent")
+  
+# Temporal_Spontaneous_NotPresent= ggplot(WinSp20_combined %>%
+#          filter(Control =="Spontaneous" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+#  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & NotPresent")
+  
+  #####
+#Temporal_AtPresent = gridExtra::grid.arrange(Temporal_Control_AtPresent, Temporal_Control_NotPresent, nrow=1)
+#Temporal_NotPresent = gridExtra::grid.arrange(Temporal_Spontaneous_AtPresent, Temporal_Spontaneous_NotPresent, nrow=1)
+#Temporal2by2 = rbind(Temporal_AtPresent, Temporal_NotPresent, size = "first")
+#Temporal2by2$widths <- unit.pmax(Temporal_AtPresent$widths, Temporal_NotPresent$widths)
+#grid.newpage()
+#grid.draw(Temporal2by2)
+
+```
+
+#### 
+
+
+```{r TablesPart1, results='asis'}
+TableTemporal = matrix(NA, nrow = 10, ncol = 2)
+colnames(TableTemporal) = c("Temporal distance options for participants", "Distance from present")
+TableTemporal[,1] = c(1:10)
+TableTemporal[,2] = c("more than 1 year away in the past",
+                      "between 1 month and 1 year in the past",
+                      "between yesterday and 1 month ago",
+                      "before in the present day",
+                      "present",
+                      "later in the present day",
+                      "between tomorrow 1 month in the future",
+                      "between 1 month and 1 year in the future",
+                      "more than 1 year away in the future", 
+                      "no specific time")
+TableTemporal = kable(TableTemporal, caption = "Table 1. Temporal Distance") %>%
+  kable_styling(latex_options = "scale_down")
+
+TableActivity = matrix(NA, nrow = 22, ncol = 2)
+TableActivity[, 1]= c(1:22)
+TableActivity[, 2]= c("Commuting as a passenger in a vehicle",
+  "Walking somewhere",
+  "Walking somewhere while using a cell phone",
+  "Daily self-care (e.g., brushing teeth, combing hair, etc.)",
+  "Studying",
+  "Working at a job",
+  "Shopping",
+  "Preparing food",
+  "Doing housework",
+  "Eating",
+  "Exercising",
+  "Taking care of children",
+  "Taking care of pets",
+  "Entertainment (e.g., watching a movie, TV show, video game, live sports game, theatre)",
+  "Participating in online activities, unrelated to entertainment (e.g. computer, internet, email, social media)",
+  "Socializing, but not currently talking to another person (e.g. party, celebration, social gathering)",
+  "Having a conversation with a person (in person or through a device)",
+  "Sensual/sexual relations with another person",
+  "Praying/worshipping",
+  "Meditating",
+  "Napping/relaxing",
+  "Doing nothing")
+TableActivity = kable(TableActivity, caption = "Activity List") %>%
+  kable_styling(latex_options = "scale_down")
+
+
+TableWithoutValenceAsCovariate = matrix(NA, nrow = 10, ncol = 4)
+colnames(TableWithoutValenceAsCovariate) = c( "Dependent Variables", "Main Effects of Attention Status", "Main Effects of Controllability", "Interaction between Attention Status and Controllability")
+## Feeling as the DV
+TableWithoutValenceAsCovariate[1,] = c("Well-being - Model Comparison",
+                                       paste("Chi^2 =", round(ModelComparisonMainAttention_FeelingNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_FeelingNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta squared =", round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[1], digits = 3)),
+                                       paste("Chi^2 =", round(ModelComparisonMainControl_FeelingNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_FeelingNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta squared =", round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[2], digits = 3)),
+                                       paste("Chi^2 =", round(ModelComparisonAttentionxControl_FeelingNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_FeelingNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta squared =", round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[3], digits = 3)))
+### R^2 for LMM
+TableWithoutValenceAsCovariate[2,] = c("Well-being - R^2 for LMM", round(RMainAttention_FeelingNoCovarite, digits = 3), round(RMainControl_FeelingNoCovarite, digits = 3), round(RAttentionxControl_FeelingNoCovarite, digits =3 ) )
+### Partial eta-square
+#TableWithoutValenceAsCovariate[3,] = c("Feeling - Partial Eta Squared",
+ #                                      round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[1], digits = 3),
+#                                       round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[2], digits = 3),
+#                                      round(PartialEta2AttentionxControl_FeelingNoCovarite$partial.etasq[3], digits = 3))
+
+## Valence as DV
+### Model comparison
+#TableWithoutValenceAsCovariate[3,] = c("Valence - Model Comparison",
+  #                                     paste("Chi^2 =", round(ModelComparisonMainAttention_ValenceNoCovarite$Chisq[2], digits = 3), ", p =", #round(ModelComparisonMainAttention_ValenceNoCovarite$`Pr(>Chisq)`[2], digits = 3 ), ", partial eta square =", round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[1], digits = 3)),
+ #                                      paste("Chi^2 =", round(ModelComparisonMainControl_ValenceNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_ValenceNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[2], digits = 3)),
+   #                                     paste("Chi^2 =", round(ModelComparisonAttentionxControl_ValenceNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_ValenceNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[3], digits = 3)))
+### R^2 for LMM
+#TableWithoutValenceAsCovariate[4,] = c("Valence - R^2 for LMM", round(RMainAttention_ValenceNoCovarite, digits = 3), round(RMainControl_ValenceNoCovarite, digits = 3), round(RAttentionxControl_ValenceNoCovarite, digits = 3))
+### Partial eta-square
+#TableWithoutValenceAsCovariate[6,] = c("Valence - Partial Eta Squared", round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[1], digits = 3), round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_ValenceNoCovarite$partial.etasq[3], digits = 3))
+
+
+## Clarity as the DV
+### Model Comparison
+TableWithoutValenceAsCovariate[3,] =c("Clarity - Model Comparison",
+                                       paste("Chi^2 =", round(ModelComparisonMainAttention_ClarityNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_ClarityNoCovarite$`Pr(>Chisq)`[2], digits = 3 ), ", partial eta square =", round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[1], digits = 3)),
+                                       paste("Chi^2 =", round(ModelComparisonMainControl_ClarityNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_ClarityNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonAttentionxControl_ClarityNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_ClarityNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[3], digits = 3)))
+
+### R^2 for LMM
+TableWithoutValenceAsCovariate[4,] = c("Clarity - R^2 for LMM", round(RMainAttention_ValenceNoCovarite, digits = 3) , round(RMainControl_ValenceNoCovarite, digits = 3), round(RAttentionxControl_ValenceNoCovarite, digits = 3))
+### Partial eta-squared
+#TableWithoutValenceAsCovariate[9,] = c("Clarity - Partial Eta Squared", round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[1], digits = 3) , round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_ClarityNoCovarite$partial.etasq[3], digits = 3))
+
+
+## Self as the DV
+### Model Comparison
+TableWithoutValenceAsCovariate[5,] = c("Self-relevancy - Model Comparison",
+                                        paste("Chi^2 =", round(ModelComparisonMainAttention_SelfNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_SelfNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta squared =", round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[1], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonMainControl_SelfNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_SelfNoCovarite$`Pr(>Chisq)`[2], digits = 3),  ", partial eta squared =", round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonAttentionxControl_SelfNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_SelfNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta squared =", round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[3], digits = 3)
+                                        ))
+### R^2 for LMM
+TableWithoutValenceAsCovariate[6,] = c("Self-relevancy - R^2 for LMM", round(RMainAttention_SelfNoCovarite, digits = 3), round(RMainControl_SelfNoCovarite, digit = 3), round(RAttentionxControl_SelfNoCovarite, digits = 3))
+### Partial eta-square
+#TableWithoutValenceAsCovariate[12,] = c("Self-relevancy - Partial Eta Squared", round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[1], digits = 3), round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_SelfNoCovarite$partial.etasq[3], digits = 3))
+
+## Importance as DV
+### Model comparison
+TableWithoutValenceAsCovariate[7,] = c("Importance - Model Comparison",
+                                        paste("Chi^2 =", round(ModelComparisonMainAttention_ImportanceNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_ImportanceNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[1], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonMainControl_ImportanceNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_ImportanceNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonAttentionxControl_ImportanceNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_ImportanceNoCovarite$`Pr(>Chisq)`[2], digits = 3),  "partial eta square =", round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[3], digits = 3)))
+### R^2 for LMM
+TableWithoutValenceAsCovariate[8,] = c("Importance - R^2 for LMM", round(RMainAttention_ImportanceNoCovarite, digits = 3), round(RMainControl_ImportanceNoCovarite, digits = 3), round(RAttentionxControl_ImportanceNoCovarite, digits = 3))
+### Partial eta-square
+#TableWithoutValenceAsCovariate[15,] = c("Importance - Partial Eta Squared", round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[1], digits = 3), round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_ImportanceNoCovarite$partial.etasq[3], digits = 3))
+
+## Reaction as DV
+### model comparison
+TableWithoutValenceAsCovariate[9,] = c("Reaction - Model Comparison",
+                                        paste("Chi^2 =", round(ModelComparisonMainAttention_ReactionNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_ReactionNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ReactionNoCovarite$partial.etasq[1], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonMainControl_ReactionNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_ReactionNoCovarite$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ReactionNoCovarite$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonAttentionxControl_ReactionNoCovarite$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_ReactionNoCovarite$`Pr(>Chisq)`[2], digits = 3),  "partial eta square =", round(PartialEta2AttentionxControl_ReactionNoCovarite$partial.etasq[3], digits = 3)))
+### R^2 for LMM
+TableWithoutValenceAsCovariate[10,] = c("Reaction - R^2 for LMM", round(RMainAttention_ReactionNoCovarite, digits = 3), round(RMainControl_ReactionNoCovarite, digits = 3), round(RAttentionxControl_ReactionNoCovarite, digits = 3))
+
+
+Table_WithoutValenceAsCovariate =TableWithoutValenceAsCovariate %>%
+  knitr::kable(digits = 3, caption = "Table 1. Effect of Attention and Control on Dependent Variables Without Valence As A Covariate") %>%
+  kableExtra::kable_styling(latex_options = "scale_down")
+```
+ 
+```{r Table_WithoutValenceAsCovariate}
+Table_WithoutValenceAsCovariate
+```
+ 
+```{r TablesPart2, results='asis'}
+TableWithValenceAsCovariate = matrix(NA, nrow = 10, ncol = 4)
+colnames(TableWithValenceAsCovariate) = c( "Dependent Variables", "Main Effects of Attention Status", "Main Effects of Controllability", "Interaction between Attention Status and Controllability")
+
+## Feeling as the DV
+TableWithValenceAsCovariate[1,] = c("Well-being - Model Comparison",
+                                        paste("Chi^2 =", round(ModelComparisonMainAttention_FeelingWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_FeelingWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonMainControl_FeelingWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_FeelingWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[3], digits = 3)),
+                                        paste("Chi^2 =", round(ModelComparisonAttentionxControl_FeelingWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_FeelingWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[4], digits = 3)))
+
+### R^2 for LMM
+TableWithValenceAsCovariate[2,] = c("Well-being - R^2 for LMM", round(RMainAttention_FeelingWithCovariate, digits = 3), round(RMainControl_FeelingWithCovariate, digits = 3), round(RAttentionxControl_FeelingWithCovariate, digits = 3) )
+### Partial eta-square
+#TableWithValenceAsCovariate[3,] = c("Feeling - Partial Eta Squared",
+                                      # round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[2], digits = 3),
+                                      # round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[3], digits = 3),
+                                      # round(PartialEta2AttentionxControl_FeelingWithCovariate$partial.etasq[4], digits = 3))
+
+
+## Clarity as the DV
+### Model Comparison
+TableWithValenceAsCovariate[3,] = c("Clarity - Model Comparison",
+                                       paste("Chi^2 =", round(ModelComparisonMainAttention_ClarityWithCovariate$Chisq[2], digits = 3), ", p =",  round(ModelComparisonMainAttention_ClarityWithCovariate$`Pr(>Chisq)`[2], digits = 3),  ", partial eta squared = ", round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[2], digits = 3) ),
+                                       paste("Chi^2 =", round(ModelComparisonMainControl_ClarityWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_ClarityWithCovariate$`Pr(>Chisq)`[2], digits = 3),  ", partial eta squared = ", round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[3], digits = 3) ),
+                                       paste("Chi^2 =", round(ModelComparisonAttentionxControl_ClarityWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_ClarityWithCovariate$`Pr(>Chisq)`[2], digits = 3),  ", partial eta squared = ", round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[4], digits = 3) ))
+### R^2 for LMM
+TableWithValenceAsCovariate[4,] = c("Clarity - R^2 for LMM", round(RMainAttention_ValenceWithCovariate, digits = 3) , round(RMainControl_ValenceWithCovariate, digits = 3), round(RAttentionxControl_ValenceWithCovariate, digits = 3))
+### Partial eta-square
+#TableWithValenceAsCovariate[6,] = c("Clarity - Partial Eta Squared", round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[2], digits = 3) , round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[3], digits = 3), round(PartialEta2AttentionxControl_ClarityWithCovariate$partial.etasq[4], digits = 3))
+
+## Self as the DV
+### Model Comparison
+TableWithValenceAsCovariate[5,] = c("Self-relevancy - Model Comparison",
+                                        paste("Chi^2 =",round(ModelComparisonMainAttention_SelfWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainAttention_SelfWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonMainControl_SelfWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonMainControl_SelfWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[3], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonAttentionxControl_SelfWithCovariate$Chisq[2], digits = 3), ", p =", round(ModelComparisonAttentionxControl_SelfWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[4], digits = 3)))
+### R^2 for LMM
+TableWithValenceAsCovariate[6,] = c("Self-relevancy - R^2 for LMM", round(RMainAttention_SelfWithCovariate, digits = 3), round(RMainControl_SelfWithCovariate, digits = 3), round(RAttentionxControl_SelfWithCovariate, digits = 3))
+### Partial eta-square
+#TableWithValenceAsCovariate[9,] = c("Self-relevancy - Partial Eta Squared", round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[3], digits = 3), round(PartialEta2AttentionxControl_SelfWithCovariate$partial.etasq[4], digits = 3))
+
+## Importance as DV
+### Model comparison
+TableWithValenceAsCovariate[7,] = c("Importance - Model Comparison",
+                                        paste("Chi^2 =",round(ModelComparisonMainAttention_ImportanceWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonMainAttention_ImportanceWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonMainControl_ImportanceWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonMainControl_ImportanceWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[3], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonAttentionxControl_ImportanceWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonAttentionxControl_ImportanceWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[4], digits = 3)))
+### R^2 for LMM
+TableWithValenceAsCovariate[8,] = c("Importance - R^2 for LMM", round(RMainAttention_ImportanceWithCovariate, digits = 3), round(RMainControl_ImportanceWithCovariate, digits = 3), round(RAttentionxControl_ImportanceWithCovariate, digits = 3))
+
+### Partial eta-square
+#TableWithValenceAsCovariate[12,] = c("Importance - Partial Eta Squared", round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[2], digits = 3), round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[3], digits = 3), round(PartialEta2AttentionxControl_ImportanceWithCovariate$partial.etasq[4], digits = 3))
+
+## Reaction as DV
+### Model comparison
+TableWithValenceAsCovariate[9,] = c("Reaction - Model Comparison",
+                                        paste("Chi^2 =",round(ModelComparisonMainAttention_ReactionWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonMainAttention_ReactionWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ReactionWithCovariate$partial.etasq[2], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonMainControl_ReactionWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonMainControl_ReactionWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ReactionWithCovariate$partial.etasq[3], digits = 3)),
+                                        paste("Chi^2 =",round(ModelComparisonAttentionxControl_ReactionWithCovariate$Chisq[2], digits = 3), ", p=", round(ModelComparisonAttentionxControl_ReactionWithCovariate$`Pr(>Chisq)`[2], digits = 3), ", partial eta square =", round(PartialEta2AttentionxControl_ReactionWithCovariate$partial.etasq[4], digits = 3)))
+### R^2 for LMM
+TableWithValenceAsCovariate[10,] = c("Reaction - R^2 for LMM", round(RMainAttention_ReactionWithCovariate, digits = 3), round(RMainControl_ReactionWithCovariate, digits = 3), round(RAttentionxControl_ReactionWithCovariate, digits = 3))
+
+
+Table_WithValenceAsCovariate =TableWithValenceAsCovariate %>%
+  knitr::kable(digits = 3, caption = "Table 2. Effect of Attention and Control on Dependent Variables With Valence As A Covariate") %>%
+  kableExtra::kable_styling(latex_options = "scale_down")
+```
+
+```{r Table_WithValenceAsCovariate}
+Table_WithValenceAsCovariate
+```
+
+```{r building a cortable for valence, well-being, attention status, include=FALSE}
+
+## first, make the variables numeric
+WinSp20_combined$Attention = dplyr::recode(WinSp20_combined$Attention,
+`AtPresent` = 1, `NotPresent` = 0)
+
+M = cor(na.omit(
+cbind(WellBeing = WinSp20_combined$Feeling_PandNP, Valence = WinSp20_combined$Valence_Speech,
+Controllability = as.numeric(WinSp20_combined$Control_Speech), Attention = WinSp20_combined$Attention)))
+
+library(corrplot)
+res1 <- cor.mtest(na.omit(
+cbind(WellBeing = WinSp20_combined$Feeling_PandNP, Valence = WinSp20_combined$Valence_Speech,
+Controllability = as.numeric(WinSp20_combined$Control_Speech), Attention = WinSp20_combined$Attention)), conf.level = .95)
+
+corrplot.mixed(M, p.mat = res1$p, insig = "label_sig", pch.col = "white", pch = "p<.05", pch.cex = .5, order = "AOE", lower.col = "black", number.cex = .9)
+
+corrplot.mixed(M, lower.col = "black", number.cex = .7)
+```
+
+# A more detailed and formal report of the project. 
+
+## Design and Protocol 
+**Characterizing Inner Speech**  The first goal of the current study was to characterize the nature and frequency of inner speech, which we refer to as the “Inner Experience” study.   To this end, we used the Experience Sampling Method (ESM) with an app called “ExpiWell” (downloaded on a mobile device), which prompted participants to answer questions about their real-time inner experience. Participants were prompted three times a day, for six days. The prompts were distributed at semi-random times from 9 am to 10 pm, with the first of the three daily prompts in the morning, the second in the afternoon, and the third prompts in the evening. ExpiWell would send a notification 15 minute after each prompt if there was no response from the participant up till that time point.  A prompt would expire if the participant did not reply to it within the predesigned one hour lapse.  We estimate that answering the questions for each prompt took as long as three minutes, such that if a participant responded to all three prompts, on each of the six days, this would amount to 18 prompts per participant, and a total of 54 minutes.  Note that participants received an instructional prompt from ExpiWell on their phone one day before experience sampling start. The instructional prompt asked them to not respond to prompts, under the following conditions: 1) they were driving (for safety reasons), 2) they were in class (because we did not want to disrupt their class time).   
+Each time the prompt went off, a series of questions was presented, with the specific flow of questions depending on the participants’ answers (see Figure 1  for the flowchart). Participants were shown the flowchart in the instructional prompt one day before the experience sampling started so that they knew what to expect during each prompt.  The opening prompt always began with an honesty prime saying “Please be honest about your experience, it’s really important to us. Thanks!”). Then, the first question was about their “Attentional Status”:, “PRESENT: My attention WAS related to my current activity, immediate surroundings, or inner experience”, which was internally coded as “At-Present”; 2) “NOT PRESENT: My attention was NOT related to my current activity, immediate surroundings”, which was internally coded as “Not-present”, 3) “ZONED OUT: I was not paying attention to anything, with no inner speech and no inner experience”, which was internally coded as “Zoned-out”.  Note that we added this third option, because we reasoned that there may be times that participants feel neither Present nor Not-Present, and we wanted to give them that option.  If participants chose (3) in an episode, then they would be asked about their momentary well-being (ranging in a 7-point scale from "Very bad" to "Very good", internally coded as Feeling), and then they would skip over the majority of the questions asked if they were chosen (1) and (2) in the episode, going straight to a question about their Current Activity, see below).  Note that we also used option (3) as a way to screen for participants who may have been overly choosing this option as a way to skip questions and finish quickly, see Data Cleaning, below.  Given that the participant chose (1) or (2), they were then asked questions about the phenomenology of their inner experience, in the following order:
+
+After the Feeling question, Participants were then asked about whether their experience involved talking to themselves or not. They were prompted "SPEECH or NO SPEECH:  Which best describes what you were experiencing?" and were provided with the three options "INNER SPEECH: I was experiencing inner speech (talking to myself INTERNALLY)"; "THINK OUT LOUD: I was talking out loud to myself (talking to myself EXTERNALLY)"; "NO SPEECH: I was NOT experiencing inner speech, or talking out loud to myself". If they chose "NO SPEECH" or they were not talking to themselves, they will be asked about the representative format of the experience (although we referred to this as “nature” for the participant), with choices that included: "BODY: I was experiencing body sensations, e.g. hunger"; "EMOTION: I was experiencing emotions, e.g. sadness"; "ENVIRONMENT: I was noticing the environment, e.g. looking at the trees"; "MUSIC/SOUNDS: I was listening to music/podcast, e.g. with my earphones in, or imagining music/sounds"; "VISUAL IMAGERY: I was experiencing visual imagery, e.g. imagining my dog"; "ANOTHER PERSON: I was experiencing another person, e.g. holding hands"; "Other (click and specify)"  
+
+The self-talk (or the nature question for No Speech prompts) question was followed by questions about the phenomenology of their inner speech or inner experience. Note that the exact wording depends on the answer to the self-talk question. If participants indicated they were talking to themselves (either inner speech or think-out-loud), the wording of questions are as follows: 
+
+ * "CLARITY:  What was the clarity of your inner/external speech?", ranging on a 7-point scale with the two extremes being "Not at all clear" and "Extremely clear", and the middle being "Moderately clear"
+ 
+ * "CONTROL: Do you feel you were in control of the inner/external speech?", on a binary scale of "YES: I CHOSE to engage in inner/external speech" and "NO: The inner/external speech I had was SPONTANEOUS"
+ 
+ * "VALENCE: What was the valence of your inner/external speech?  If a stranger saw the content of your inner/external speech (i.e., just the actual words), how would they rate it?", ranging on a 7-point scale with the two extremes being "Very negative" and "Very positive", and the middle being "Neutral"
+ 
+ * "SELF-RELATED: Was your inner/external speech related to yourself in any way?" on a binary scale, and the options were "YES: For example, analyzing myself, thinking/talking about getting something done, or thinking/talking about myself in relation to other people" and "NO: For example, thinking/talking about other people I know or don't know, or thinking about something unrelated to others (e.g. wondering if it will rain)" 
+ 
+ * "PAST/FUTURE: What was the temporal distance of the thought?" ranging in a 9-point scale, shown in Table 1. This question on the Temporal Distance of the thought was planned to be a dependent measure, but later Temporal Distance response was combined with Attention Statsus responses to serve as a data-cleaning rule, see data-cleaning for detail. Because the data-cleaning pertained to the distribution of Attention Status on Temporal Distance, the effect of Attention Status on Temporal Distance will not be analyzed and therefore, Temporal Distance was not a dependent variable. Nonetheless, the histogram of Temporal Distance of Not-Present prompts were presented in Figure 2.
+ 
+ * "IMPORTANCE: How important was the inner/external speech?", ranging on a 7-point scale with the two extremes being "Not at all important" and "Extremely important", and the middle being "Moderately important".
+
+If No Speech was chosen in an episode, only Clarity, Control, and Valence would be asked. And the wording of these question was altered to tailor to the No Speech experience, by changing "inner/external speech" to "inner experience". Moreover, No Speech episodes did not get to answer Self-related, Temporal Distance and Importance questions since we believe these three features are pertain to self-talk but not other representative format of thought.
+
+Theoretically, the Feeling question enables us to concetually replicate the original results of Killingsworth and Gilbert (2010).  As described in the Introduction, this previous study showed that momentary well-being is better when people are Present (in their study defined as “not thinking about something other than what they are currently doing” vs. Not-Present (in their study defined as “thinking about something other than what they are currently doing”), at least when the Not-Present thoughts are either “neutral” or “negative”.   The data of the current study allowed us to investigate the same question, noting that there are six methodological differences between the current study and that of Killingsworth and Gilbert (2010), as follows: 1) The current study provided a third option for Attention Status, i.e., “Zoned-Out”, 2) The current study (but not the Killingsworth & Gilbert study) asked participants if they experienced inner speech, 3) The current study used a 7-point scale for rating well-being , whereas the Killingsworth and Gilbert study used a sliding scale from 0 – 100, 4) The current study had participants answer many more questions than the Killingsworth and Gilbert study, which might have contaminated their penultimate response about well-being.  5) The Current Activities used were slightly different between the two studies, and 6) The current study collected data from a relatively small (`r N` participants) group of college students, whereas Killingsworth & Gilbert collected data from a very large and diverse sample (2250 participants, recruited from the lab website, 18 – 88 years, from different countries). All of these differences, and their potential effects on the results, are addressed in the Discussion. 
+
+The very last question asked at the end of all prompts was about the participants’ Current Activity, for which they were given a list of 21 possible activities (see Table 2).  Our list overlapped with, but was not identical to, those employed in Killingsworth and Gilbert (2010), as well as Kahneman, Krueger, Schkade, Schwarz, and Stone (2004). These current activity responses were used for three purposes.  First, we asked whether the distribution of activities differed across different attention statuses. Second, we directly asked whether well-being differs across different activities (mirroring Killingsworth & Gilbert, 2010). Third, given the possibility that the distribution of activities differs across attentional states, and that current activity affects some of our dependent measures (e.g., well-being, Clarity, Controllability, etc.), we included current activity as a random effect in our statistical models when comparing effects across different attention statuses.  Note that the current study is only testing the link between Current Activity and well-being, although a  future analysis might ask whether other dependent variables, e.g., Clarity, Controllability, differs across current activity.  
+
+For the current study, we restricted our analyses to prompts where participants reported experiencing Inner Speech, which accounted for `r InnerSpeechPercentage`% of all prompts (reported in more detail in the Results). With these data, the current study asked whether inner speech differs for moments when people are Present vs. Not-Present and for inner speech that is Controlled vs. Spontaneous, with respect to: Clarity, Importance, and Self-related thought.  Valence was used as a predictor variable and/or covariate (see Data Analysis, below).
+
+## Procedure
+
+## Data cleaning
+We removed participants who did not appear to be adequately engaged in the protocol, which was determined in two ways.  First, participants were removed if they chose “Zoned-Out” too frequently.  As explained above, participants knew that choosing “Zoned-Out” led to them skipping over the majority of the questions regarding their inner experience, and therefore may have been choosing it as a way to finish quickly.  If a participant chose Zoned-Out too frequently, we considered this suspicious.  To this end, for each participant, we calculated the proportion of prompts for which they chose the “Zoned-Out” option.  If the Zoned-Out proportion for a participant was greater than three standard deviations above the mean (across participants), this participant was removed from the analysis (N = `r WI20_Susbicious+SP20_Susbicious`). Second, participants were removed if they provided insufficient numbers of prompts; participants who completed less than nine prompts were removed from the analysis (N = `r WI20_FewPrompts+SP20_FewPrompts`). Further, we also removed experience sampling episodes that are not internally consistent. Specifically, we removed experience samling episodes if "At-present" was chosen to be the Attention Status of the episode, but "At the present moment" was not chosen as the Temporal Distance of the episode. After the extensive data-cleaning, we found that participants responsed to `r N_prompts/N` prompts on average, which corresponds to a rate of `r (N_prompts/N)/18*100`%. In total, the ESM data consisted of `r N_prompts` prompts from `r N` participants.  The median lapse between the time the App sent those prompts and the time participants’ responded was `r median_wait`. The median time for partcipants to finish a prompt `r median_finish`.
+
+## Data analysis
+We used `r cite_r("r-references.bib")` for all our analyses.
+
+**Question 1: What is the distribution of different attentional states (Present, Not-Present, Zoned-Out), with and without inner speech?** Using data from all `r N_prompts` prompts (across `r N` participants), we report descriptive statistics of the proportions for 5 different prompt outcomes (which add up to 100%): 1) Present (with Inner Speech), 2) Not-Present (with Inner Speech), 3) Present (without Inner Speech), 4) Not-Present (without Inner Speech), and 5) Zoned-Out.  Note that for (1) and (2), we included any prompt for which the participant reported experiencing Inner speech, even if they had also selected one of the Non-Inner speech representative formats.  For (3) and (4), we included any prompt for which the participant did not report experiencing Inner speech, and we collapsed across prompts from different representative formats. Only data from (1), (2) and (5) were analyzed further in the remaining study questions.
+
+**Question 2:  Does momentary (state) well-being differ when people are Present vs. Not-Present?**  This question served as a conceptual replication of the Killingsworth & Gilbert (2010) study, which reported that people are happier when they are Present vs. Not-Present.  Like Killingsworth & Gilbert (2010), we provide visual depictions of  mean well-being (averaged across prompts) for the different Current Activities, collapsing across Attention Status (with proportion of prompts represented by the size of the data point).  Likewise, we present mean well-being across the different Attention Statuses, collapsing across the different Current Activities (with proportion of prompts represented by the size of the data point). 
+
+We then used statistical models to analyze the data as follows.  First, we were curious as to whether the distribution of Current Activities differed across the three main Attentional Statuses (At-Present, Not-Present and Zoned Out).  To this end, we conducted a simple Chi-square (3 Attention Statuses x 22 Activities).  (If the distributions do differ, and if current Activity affects well-being, it is of course imperative to include Current Activity in any model that looks at the effects of Attention status on well-being).  Second, we used a linear mixed effect model to determine whether well-being differs across the three main attentional states (At-Present, Not-Present and Zoned-Out).  Here, we used prompt as the unit of analysis, with the dependent measure being well-being (score from -3 to 3), the predictor variable being attention status (At-Present, Not-Present and Zoned-Out) and the random effects being Participant and Current Activity.  Although current Activity was a random effect, the model will nonetheless determine its unique contribution (in terms of variance accounted for) to well-being .  Third, we then investigated the joint effects of Attention Status and Valence (since Valence was an important variable in Killingsworth & Gilbert, 2010), with the same linear mixed model, but excluding Zoned-Out prompts, and including Valence as another predictor variable (ranging continuously from -3 to 3). We also investigated the interaction between Attention Status and Valence, to see if Valence might have a different effect on well-being when one is At-Present vs. Not-Present.
+
+**Question 3: How does the nature of inner speech differ across different attention statuses, and level of control?**  Here, we asked whether Attention Status (At-Present vs. Not-Present) and Controllability (Controlled vs. Spontaneous), or a combination of the two, are related to the phenomenological nature of Inner Speech.   We were driven to include Controllability as a predictor variable because we hypothesized that this might affect the inner experience as much as, if not more, than whether one is At-Present vs. Not-Present.  Testing the effects of Controllability also allows us to join the discussion of the definition of mind-wandering, and whether it is deleterious, which is under debate in the research field.  In line with Seli et al., it may be that in the current study, the combination of Not-Present and Spontaneous constitutes Mind-wandering, which may be its own unique category. If so, this combination may stand out in a statistical analysis as an interaction between Attention Status and Controllability. 
+  
+The following five phenomena were investigated: Clarity, Valence, Feeling, Importance, and Self-relevancy.  Each of these were included as the dependent measure in a linear mixed effect model, where prompt was the unit of analysis, the random effects were Participant and Current Activity, and the two predictor variables were Attention Status (At-Present, vs. Not-Present, data collapsed across Valence) and Controllability (Controlled vs. Spontaneous).  An additional interaction term (Attention Status x Controllability) was included in the model to address the possibility that the two effects interact.   Finally, in a separete analysis, we included Valence as a covariate for Clarity, Feeling, Importance, and Self-relevancy. Since we learned from results of Question 2 that Valence had a strong relationship with well-being, and we reasoned that it might also have an effect on some of our other dependent measures, which should be controlled in our model.  In Table 4 of the results, we present statistical results with Valence included vs. excluded as a covariate, just to show that our findings are robust either way.  When there was either a difference between models that included vs. excluded Valence or when we found an effect of the covariate Valence, we emphasize that in the Results.  Otherwise, we present just the results when Valence was not included as a covariate.  
+
+There are a few things to note about the analyses associated with Question 3.  First, note that, with the exception of Self-Relevancy (which is binary and therefore used a logistic regression), all the dependent measures are continuous.  Second, momentary well-being is one of the dependent measures we investigate in Question 3, even though it is also investigated in Question 2.  The difference is that Question 2 asks about well-being as a function of Attention status and Valence (for a conceptual replication of Killingsworth & Gilbert), whereas Question 3 asks about well-being as a function of Attention Status and Controllability (and includes Valence as a “covariate”, since we found it to have effects on well-being in Question 2).   Third, because both Attention Status and Controllability were included in the same model, the model accounts for any relatedness between the two, allowing us to determine the unique contribution of each (if there is one) to the dependent measure.  In fact, one of our research questions was whether there is any relatedness between Attention Status and Controllability (i.e., is there a greater chance to be in control of inner speech when one is At-Present vs. Not-Present)?  To investigate this interrelatedness, we conducted a generalized linear mixed model, similar to those described above, with the difference being that the binary variable Controllability became the dependent variable and Attention Status was the predictor variable. (Note that we chose not to conduct a simple Chi-square to address this question, as it cannot account random effects of Participant and Current Activity).  Forth, we acknowledge we are conducting models on multiple dependent measures, which of course, leads to an increased chance of Type I errors.  For this reason, we also reported the effect sizes through partial eta-square and the R-square for linear mixed-models (Nakagawa & Schielzeth, 2013), and not just *p* values. Even then, the current study should be considered exploratory.   
+
+## Results
+**Q1: Distribution of different attention statuses** The percentage of the `r N_prompts` prompts is broken down in Figure 3, for five categories: 1) At-Present (with Inner Speech), 2) Not-Present (with Inner Speech), 3) At-Present (without Inner Speech), 4) Not-Present (without Inner Speech), 5) Zoned-Out.  By collapsing Categories (1) and (3), and collapse Categories (2) and (4), we find that At-Present, Not-present, and Zoned-Out prompts accounts for `r Present_Percentage`% (*SD* = `r sd_Present_prob_combined_20`%), `r NotPresent_Percentage`% (*SD* = `r sd_NP_prob_combined_20`%), and `r ZonedOut_Percentage`% (*SD* = `r sd_Zoned_prob_combined_20`%) of the prompts, respectively. These percentages of At-Present vs. Not-Present are within the range reported in previous (within and outside the laboratory) studies of college students (range of Not-Present percentage = 15%-50%, McVay, Kane & Kwapil, 2009, Song & Wang, 2012). The current study is the first to report that college students report feeling “Zoned-Out” a large proportion of the time, although we acknowledge that this percentage may be artificially inflated in the Discussion. Only data from categories (1), (2) and (5) were analyzed further in the remaining study questions.  
+	
+**Q2: Does momentary (state) well-being differ when people are At-Present vs. Not-Present?** As a conceptual replication of Killingsworth and Gilbert (2010), in Figure 4 and 5, we present visual depictions of mean momentary well-being (averaged across prompts) for the different Current Activities (collapsing across Attention Status) and for the different Attention Statuses (collapsing across the different Current Activities), with proportion of prompts represented by the size of the data point .  Note that we do perform statistics on these descriptive data, yet come back to a statistical model of well-being later in the Results.  In Figure 4, it can be seen that “meditation” and "exercising" are Current Activities that are associated with more positive feeling, which in line with previous studies showing that meditation and exercising elevates well-being (e.g., Archer, Josefsson & Lindwall, 2014; Brown & Ryan, 2003; Menezes & Bizarro, 2015; Wolkin, 2015).  The other activities associated with better feeling include "Sensual/sexual" and "worshiping/praying" which were not surprising.  By contrast, "Doing Nothing", which we interpret as not doing anything meaningful, was associated low momentary well-being. It has been documented that bored participants during dry and meaningless lab activities would rather self-administer shocks than continue the activities. It is unsurprising that participants feel that doing nothing is a miserable way to spend time. “Online activities” was associated with low average momentary well-being, which is in line with previous studies showing that high amounts of time using social media is associated with anxiety and depressive symptoms (e.g., Rosen et al., 2013; Evren et al., 2018).  
+
+  In Figure 4, it can be seen that the two Attention Statuses associated with highest momentary well-being were Zoned-Out and At-Present, with lower values for Not-Present.   Our results provide a conceptual replication of Killingsworth & Gilbert (2010), in showing that people (college students) are happier when they are At-Present vs. Not-Present.  Unlike Killingsworth & Gilbert (2010), who suggested that there is more variation in well-being across different Attention Statuses than across different Current Activities, this was not obvious in the current study.  This difference between studies could be due to methodological differences between the two (see Methods).
+
+In our next analysis, the results of a Chi-square showed that the distribution of Current Activities differed across the three main Attentional Statuses (At-Present, Not-Present and Zoned Out)($\chi^2$(`r as.numeric(Activity3states$parameter)`) =`r as.numeric(Activity3states$statistic)`, *p*`r printp(.000001)`).  Post-hoc analysis showed that this difference was driven by differences across each of the three pairings:  At-Present vs. Not-Present ($\chi^2$ =`r ActivityAPNP$statistic`, *p*`r printp(.000001)`), At-Present vs. Zoned-Out ($\chi^2$ =`r ActivityZonedAP$statistic`, *p*`r printp(.000001)`) and Not-Present vs. Zoned-Out ($\chi^2$ =`r ActivityZonedNP$statistic`, *p*`r printp(.000001)`).  These differences are driven mainly by a few activities.  For example, napping/relaxing are particularly high frequency activities when participants report being Zoned-Out, yet particularly low when being At-Present. And, working/studying are particularly high frequency activities when participants report being At-Present, yet particularly low when participants are Zoned-Out and Not-Present. 
+
+Because the distributions of Current Activity were found to differ across Attention Status, and given that Current Activity affects well-being (as can be seen in Figure 3), it is of course imperative to include Current Activity in any model that looks at the effects of Attention status on well-being, which we turn to next.  The results of our linear mixed effect model (see Methods) showed that Attention Status is a significant predictor of well-being ($\chi^2$ =`r AttentionOnFeeling$Chisq[2]`, *p*`r printp(.000001)`).  However, when Zoned-Out was removed from the model, which more closely mimics the statistical analysis of Killingsworth & Gilbert (2010) that compared only At-Present vs. Not-Present, well-being was found to be significantly higher for At-Present vs. Not-Present prompts (*z* =`r emmeancomparison_AttentionFeeling$z.ratio[1]`, *p*`r printp(.000001)`).  Interestingly, Feeling of Not-Present was found to be lower than Feeling of Zoned-Out (*z* =`r emmeancomparison_AttentionFeeling$z.ratio[3]`, *p*`r printp(.000001)`). As might be expected, Zoned-Out was associated with lower feeling than At-Present (*z* =`r -emmeancomparison_AttentionFeeling$z.ratio[2]`, *p*`r printp(.000001)`).  
+
+In the next model, we once again excluded Zoned-Out, and added another predictor variable, Valence (participants were asked to rate, from "very negative" to "very positive", the valence of their inner speech content, from an objective perspective) as well as an interaction term between Attention Status and Valence. The model-comparison (Valence on Feeling w/ Attention vs. w/o Attention in as a predictor) shows that including Attention Status as a predictor significantly improves model fits (main effect of Attention Status: $\chi^2$ =`r as.numeric(AttentionOnTopValence$Chisq[2])`, *p*`r printp(.000001)`). Further, revealed significantly higher well-being for At-Present vs. Not-Present prompts (*z* = `r emmeancomparison_NO_Zoned_AttentionXValence$z.ratio`, *p*`r printp(.000001)`).  There was no interaction between the Attention Status and Valence ($\chi^2$ =`r as.numeric(AttentionInteractValence$Chisq[2])`, *p* =`r AttentionInteractValence_pval`), indicating that the effect of Valence on momentary well-being does not differ between At-Present and Not-Present prompts.  To visualize these effects, in Figure 5 we present regression lines of well-being vs. Valence, separately for At-Present vs. Not-Present prompts, where it can be seen that the line for At-Present prompts is elevated that for Not-Present prompts. In sum, the results from these analyses suggest that participants are happier when they are At-Present and when Inner Speech is more positive and that these two effects can be considered be additive with each other on Well-being.
+
+**Question 3: Nature of inner speech as a function of attention status and controllability**   Before investigating how Attention Status and Controllability are related to the phenomenological nature of Inner Speech, the interrelatedness between Attention Status and Controllability was examined. A generalized linear mixed effect model with Control as the reactor factor and Attention Status as the predictor factor (see Methods) showed that there was a significantly greater chance that inner speech was controlled (vs. spontaneous) when participants were At-Present vs. Not-Present ($\chi^2$ = `r AttentionOnControl$Chisq[2]`, *p*`r printp(.000001)`).  Because Attention Status and Controllability are interrelated, and because Attention Status is likely to affect at least some of our dependent measures (as was seen in Question 2 showing effects of Attention Status on Feeling), it is of course imperative to include both Attention Status and Controllability in the same model to determine the unique contribution of each (if there is one) to our dependent measures, which we turn to next.   
+
+  Linear mixed effect models were performed for 5 different dependent measures: Clarity, Feeling, Valence, Self-relevancy, and Importance. For each dependent measure, we investigated the effects of Attention Status, Controllability, and their interaction. Analyses were done both when Valence was included vs. excluded as a covariate, for exploratory reasons. Results of when Valence as not included as the covariate are presented in table format in Table 4. Obviously, the analysis when Valence is a covariate is not possible when Valence is also a dependent measure. The results of the rest of the dependent measures of when Valence was included as a covariate were presented in Table 5. To prevent redundency, we only present in text the result of when Valence was excluded as the covariate, unless its inclusion changed the results substantially (see Methods).  
+  
+  We found the significance levels of *p*-values of model-comparisons for Attention Status, Control and their interaction in Table 4 and Table 5 are the same, although there was a general reduction for these three factors' Chi-squares, partial eta-squared, and R-squared. For Clarirty, Attention Status and Control are both significant predictors, but not their interaction term. Specifically, compared with not-present and out-of-control, being at-present and in-control is associated with higher Clarity (At-Present vs. Not-Present: *z* = `r round(emmeancomparison_AttentionXControl_clarity$z.ratio, digits = 3)`, *p*`r printp(.000001)`; In-Control vs. Spontaneous: *z* = `r round(emmeancomparison_AttentionXControl_clarity_control$z.ratio, digits = 3)`, *p*`r printp(.000001)`). Similarly, for Valence and Feeling, Attention Status and Control are both significant predictors. But the interaction between Attention Status and Control was not a significant predictor for Valence or Feeling. Specifically, at-present was associated with greater Valence (*z* = `r round(emmeancomparison_AttentionXControl_Valence$z.ratio, digits = 3)`, *p*`r printp(.000001)`) and Feeling (*z* = `r round(emmeancomparison_AttentionXControl_Feeling$z.ratio, digits = 3)`, *p*`r printp(.000001)`). In-control was also associated with greater Valence (*z* = `r round(emmeancomparison_AttentionXControl_Valence_control$z.ratio, digits = 3)`, *p*`r printp(.000001)`) and Feeling (*z* = `r round(emmeancomparison_AttentionXControl_Feeling_control$z.ratio, digits = 3)`, *p*`r printp(.000001)`) than Spontaneous. For Self-relevancy of the inner-speech content, neither Attention Status nor the interaction term between Attention Status and Control was a significant predictor. However, the main effect of Control was significant: In-control is associated with significantly higher Self-relevancy than Spontaneous (In-control vs. Spontaneous: *z* = `r round(emmeancomparison_AttentionXControl_Self_control$z.ratio, digits = 3)`, *p*`r printp(.000001)`). For Importance of Inner-Speech content, the main effect of Attention Status was not significant. But there was a significant main effect of Control and the interaction between Attention Status and Control on Importance. Specifically: In-Control was associated with higher  than Spontaneous across Attention Statuses, but the difference of Importance was greater in At-Present than the Importance difference in Not-Present.
