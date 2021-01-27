@@ -1,0 +1,3123 @@
+---
+title: "Dissertation Proposal"
+output: html_document
+---
+#Both
+```{r CleanPreviousOrConsole, include=FALSE}
+#07272020 checked
+rm(list = ls())
+
+rm = cat("\014")
+```
+#Both
+```{r ImportPackages, include=FALSE}
+#07272020 checked
+library(apa)
+library(citr)
+library(papaja)
+library(MOTE)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(dplyr)
+library(pwr)
+library(emmeans)
+library(sjPlot)
+library(effects)
+library(MuMIn)
+library(sjstats)
+library(gridExtra)
+library(grid)
+library(gtable)
+library(gplots)
+library(corrplot)
+library(lubridate)
+```
+#Both
+```{r ImportDatasets, include=FALSE}
+#07272020 checked
+corpus_Win20_raw_after020720 <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_after 020720.csv")
+Corpus_spring20_raw <- read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/Corpus_spring20.csv")
+```
+#Both
+```{r CleanRawData, include=FALSE}
+#07272020 checked
+
+# Build non-raw
+corpus_Win20_cleaned_after020720 = corpus_Win20_raw_after020720
+
+# change headers
+## after 020720file
+names(corpus_Win20_cleaned_after020720) <- as.matrix(corpus_Win20_cleaned_after020720[1, ])
+corpus_Win20_cleaned_after020720 <- corpus_Win20_cleaned_after020720[-1, ]
+corpus_Win20_cleaned_after020720[] <- lapply(corpus_Win20_cleaned_after020720, function(x) type.convert(as.character(x)))
+
+# clean the roles with "NA" column names
+## after 020720file
+corpus_Win20_cleaned_after020720  =  as.data.frame(corpus_Win20_cleaned_after020720[-c(1:2), -c(5:8)])
+
+# changing column names into something meaningful
+## after 020720 file
+colnames(corpus_Win20_cleaned_after020720) = c("Start Date",
+                                                "End Date",
+                                                "Time Scheduled",
+                                                "Duration (in seconds)",
+                                                "ID",
+                                                "Honest",
+                                                "Attention",
+                                                "Feeling_ZonedOut",
+                                                "Feeling_PandNP",
+                                                "SpeechNoSpeech",
+                                                "NatureIfNoSpeech",
+                                                "Clarity_Speech", 
+                                                "Control_Speech", 
+                                                "Valence_Speech",
+                                                "SpecifyNature", 
+                                                 "Clarity_NoSpeech", 
+                                                "Control_NoSpeech", 
+                                                "Valence_NoSpeech",
+                                                "Self_Speech",
+                                                "Temporal_Speech",
+                                                "Importance_Speech", 
+                                                "Reaction_Speech", 
+                                                "Activity")
+#internally label the Attention Statuses
+corpus_Win20_cleaned_after020720$Attention <- as.character(corpus_Win20_cleaned_after020720$Attention)
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="PRESENT: My attention WAS related to my current activity, immediate surroundings, or inner experience"] <- "AtPresent"
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="NOT PRESENT: My attention was NOT related to my current activity, immediate surroundings"] <- "NotPresent"
+corpus_Win20_cleaned_after020720$Attention[corpus_Win20_cleaned_after020720$Attention=="ZONED OUT: I was not paying attention to anything, with no inner speech and no inner experience"] <- "ZoneOut"
+
+## this outcomes are not numeric
+corpus_Win20_cleaned_after020720$Activity <- as.character(corpus_Win20_cleaned_after020720$Activity)
+corpus_Win20_cleaned_after020720$ID <- as.character(corpus_Win20_cleaned_after020720$ID)
+(n.participants.Win20 <- length(unique(corpus_Win20_cleaned_after020720$ID))) # 380
+corpus_Win20_cleaned_after020720$Honest <- as.character(corpus_Win20_cleaned_after020720$Honest)
+
+(n.completed.prompt.Win20 <- nrow(corpus_Win20_cleaned_after020720)) ##5766 prompts were received
+
+#' this is the recode process for the subjective and objective valence of thought, which would be helpful to understand the extremeness of thought in a more intuitive way
+corpus_Win20_cleaned_after020720$Feeling_ZonedOut = dplyr::recode(corpus_Win20_cleaned_after020720$Feeling_ZonedOut,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+corpus_Win20_cleaned_after020720$Feeling_PandNP = dplyr::recode(corpus_Win20_cleaned_after020720$Feeling_PandNP,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+corpus_Win20_cleaned_after020720$SpeechNoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$SpeechNoSpeech,
+`INNER SPEECH: I was experiencing inner speech (talking to myself INTERNALLY)` = 'InnerSpeech',
+`NO SPEECH: I was NOT experiencing inner speech, or talking out loud to myself.` = 'NoSpeech',
+`THINK OUT LOUD: I was talking out loud to myself (talking to myself EXTERNALLY)` = 'ThinkOutLoud')
+
+
+corpus_Win20_cleaned_after020720$NatureIfNoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$NatureIfNoSpeech,
+`ANOTHER PERSON: I was experiencing another person, e.g. holding hands.` = "AnotherPerson",
+`BODY: I was experiencing body sensations, e.g. hunger.` = "Body",
+`EMOTION: I was experiencing emotions, e.g. sadness.` = "Emotion",
+`ENVIRONMENT: I was noticing the environment, e.g. looking at the trees.` = "Environment",
+`MUSIC/SOUNDS: I was listening to music/podcast, e.g. with my earphones in, or imagining music/sounds.` = "MusicOrSounds",
+`Other (click and specify)` = "Other",
+`VISUAL IMAGERY: I was experiencing visual imagery, e.g. imagining my dog.` = "VisualImagery")
+
+
+corpus_Win20_cleaned_after020720$Clarity_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Clarity_Speech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+corpus_Win20_cleaned_after020720$Control_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Control_Speech,     `NO: The inner/external speech I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in inner/external speech.` =  1 )                                                    
+corpus_Win20_cleaned_after020720$Valence_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Valence_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Clarity_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Clarity_NoSpeech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+corpus_Win20_cleaned_after020720$Control_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Control_NoSpeech,     `NO: The inner experience I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in my inner experience.` = 1)                                
+
+corpus_Win20_cleaned_after020720$Valence_NoSpeech = dplyr::recode(corpus_Win20_cleaned_after020720$Valence_NoSpeech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Self_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Self_Speech, 
+`NO: For example, thinking/talking about other people I know or don't know, or thinking about something unrelated to others (e.g. wondering if it will rain).` = "NotSelf", 
+`YES: For example, analyzing myself, thinking/talking about getting something done, or thinking/talking about myself in relation to other people.` = "SelfRelated")
+
+corpus_Win20_cleaned_after020720$Importance_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Importance_Speech, 
+`1: Not at all important` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately important` = 4,
+`5` = 5,
+`6` = 6, 
+`7: Extremely important` = 7)
+
+corpus_Win20_cleaned_after020720$Reaction_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Reaction_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+corpus_Win20_cleaned_after020720$Temporal_Speech = dplyr::recode(corpus_Win20_cleaned_after020720$Temporal_Speech,
+`more than 1 year away in the past`  = -4,
+`between 1 month and 1 year in the past` =-3,
+`between yesterday and 1 month ago` =-2,
+`before in the present day` =-1,
+`present` =0,
+`later in the present day`= 1,
+`between tomorrow 1 month in the future` =2,
+`between 1 month and 1 year in the future` =3,
+`more than 1 year away in the future` =4,
+`no specific time` = NaN )
+
+# Build non-raw
+Corpus_spring20_cleaned = Corpus_spring20_raw
+
+# change headers
+
+## after 020720file
+names(Corpus_spring20_cleaned) <- as.matrix(Corpus_spring20_cleaned[1, ])
+Corpus_spring20_cleaned <- Corpus_spring20_cleaned[-1, ]
+Corpus_spring20_cleaned[] <- lapply(Corpus_spring20_cleaned, function(x) type.convert(as.character(x)))
+
+# clean the roles with "NA" column names
+## before 020720file
+Corpus_spring20_cleaned = as.data.frame(Corpus_spring20_cleaned[-c(1:2), -c(5:8)])
+
+# changing column names into something meaningful
+colnames(Corpus_spring20_cleaned) = c(          "Start Date",
+                                                "End Date",
+                                                "Time Scheduled",
+                                                "Duration (in seconds)",    
+                                                "ID",
+                                                "Honest",
+                                                "Attention",
+                                                "Feeling_ZonedOut",
+                                                "Feeling_PandNP",
+                                                "SpeechNoSpeech",
+                                                "NatureIfNoSpeech",
+                                                "Clarity_Speech", 
+                                                "Control_Speech", 
+                                                "Valence_Speech",
+                                                "SpecifyNature", 
+                                                 "Clarity_NoSpeech", 
+                                                "Control_NoSpeech", 
+                                                "Valence_NoSpeech",
+                                                "Self_Speech",
+                                                "Temporal_Speech",
+                                                "Importance_Speech", 
+                                                "Reaction_Speech", 
+                                                "Activity")
+
+#internally label the Attention Statuses
+Corpus_spring20_cleaned$Attention <- as.character(Corpus_spring20_cleaned$Attention)
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="PRESENT: My attention WAS related to my current activity, immediate surroundings, or inner experience"] <- "AtPresent"
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="NOT PRESENT: My attention was NOT related to my current activity, immediate surroundings"] <- "NotPresent"
+Corpus_spring20_cleaned$Attention[Corpus_spring20_cleaned$Attention=="ZONED OUT: I was not paying attention to anything, with no inner speech and no inner experience"] <- "ZoneOut"
+
+## this outcomes are not numeric
+Corpus_spring20_cleaned$Activity <- as.character(Corpus_spring20_cleaned$Activity)
+Corpus_spring20_cleaned$ID <- as.character(Corpus_spring20_cleaned$ID)
+(n.participants.Win20 <- length(unique(Corpus_spring20_cleaned$ID))) # 421
+Corpus_spring20_cleaned$Honest <- as.character(Corpus_spring20_cleaned$Honest)
+
+(n.completed.prompt.Win20 <- nrow(Corpus_spring20_cleaned)) ## 6302 prompts were received
+
+#' this is the recode process for the subjective and objective valence of thought, which would be helpful to understand the extremeness of thought in a more intuitive way
+Corpus_spring20_cleaned$Feeling_ZonedOut = dplyr::recode(Corpus_spring20_cleaned$Feeling_ZonedOut,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+Corpus_spring20_cleaned$Feeling_PandNP = dplyr::recode(Corpus_spring20_cleaned$Feeling_PandNP,
+`0: Neutral` = 0, '-1' = -1, '-2'= -2, '-3: Very bad' = -3, '1' = 1, `2` = 2, '3: Very good' = 3)
+
+Corpus_spring20_cleaned$SpeechNoSpeech = dplyr::recode(Corpus_spring20_cleaned$SpeechNoSpeech,
+`INNER SPEECH: I was experiencing inner speech (talking to myself INTERNALLY)` = 'InnerSpeech',
+`NO SPEECH: I was NOT experiencing inner speech, or talking out loud to myself.` = 'NoSpeech',
+`THINK OUT LOUD: I was talking out loud to myself (talking to myself EXTERNALLY)` = 'ThinkOutLoud')
+
+
+Corpus_spring20_cleaned$NatureIfNoSpeech = dplyr::recode(Corpus_spring20_cleaned$NatureIfNoSpeech,
+`ANOTHER PERSON: I was experiencing another person, e.g. holding hands.` = 'AnotherPerson',
+`BODY: I was experiencing body sensations, e.g. hunger.` = 'Body',
+`EMOTION: I was experiencing emotions, e.g. sadness.` = 'Emotion',
+`ENVIRONMENT: I was noticing the environment, e.g. looking at the trees.` = 'Environment',
+`MUSIC/SOUNDS: I was listening to music/podcast, e.g. with my earphones in, or imagining music/sounds.` = 'MusicOrSounds',
+`Other (click and specify)` = 'Other',
+`VISUAL IMAGERY: I was experiencing visual imagery, e.g. imagining my dog.` = 'VisualImagery')
+
+
+Corpus_spring20_cleaned$Clarity_Speech = dplyr::recode(Corpus_spring20_cleaned$Clarity_Speech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+Corpus_spring20_cleaned$Control_Speech = dplyr::recode(Corpus_spring20_cleaned$Control_Speech,     `NO: The inner/external speech I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in inner/external speech.` =  1 )                                                    
+Corpus_spring20_cleaned$Valence_Speech = dplyr::recode(Corpus_spring20_cleaned$Valence_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Clarity_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Clarity_NoSpeech, 
+`1: Not at all clear` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately clear` = 4,
+`5` = 5, 
+`6` = 6,
+`7: Extremely clear` = 7)
+                                                                
+Corpus_spring20_cleaned$Control_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Control_NoSpeech,     `NO: The inner experience I had was SPONTANEOUS.` = 0, 
+`YES: I CHOSE to engage in my inner experience.` = 1)                                
+
+Corpus_spring20_cleaned$Valence_NoSpeech = dplyr::recode(Corpus_spring20_cleaned$Valence_NoSpeech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Self_Speech = dplyr::recode(Corpus_spring20_cleaned$Self_Speech, 
+`NO: For example, thinking/talking about other people I know or don't know, or thinking about something unrelated to others (e.g. wondering if it will rain).` = "NotSelf", 
+`YES: For example, analyzing myself, thinking/talking about getting something done, or thinking/talking about myself in relation to other people.` = "SelfRelated")
+
+Corpus_spring20_cleaned$Importance_Speech = dplyr::recode(Corpus_spring20_cleaned$Importance_Speech, 
+`1: Not at all important` = 1, 
+`2` = 2, 
+`3` = 3,
+`4: Moderately important` = 4,
+`5` = 5,
+`6` = 6, 
+`7: Extremely important` = 7)
+
+Corpus_spring20_cleaned$Reaction_Speech = dplyr::recode(Corpus_spring20_cleaned$Reaction_Speech, 
+`-3: Very negative` = -3, 
+`-2` = -2, 
+`-1` = -1, 
+`0: Neutral` = 0, 
+`1` = 1, 
+`2` = 2,
+`3: Very positive` = 3)
+
+
+Corpus_spring20_cleaned$Temporal_Speech = dplyr::recode(Corpus_spring20_cleaned$Temporal_Speech,
+`more than 1 year away in the past`  = -4,
+`between 1 month and 1 year in the past` =-3,
+`between yesterday and 1 month ago` =-2,
+`before in the present day` =-1,
+`present` =0,
+`later in the present day`= 1,
+`between tomorrow 1 month in the future` =2,
+`between 1 month and 1 year in the future` =3,
+`more than 1 year away in the future` =4,
+`no specific time` = NaN )
+```
+#Both
+```{r SuspiciousParticipant, include=FALSE}
+#07272020 checked
+
+zoned.n.Win20 <- corpus_Win20_cleaned_after020720 %>%
+  group_by(ID, Attention) %>%
+  dplyr::summarize(zoned.n.Win20 = n()) %>%
+  filter(Attention== "ZoneOut")
+
+
+total.n.Win20 <- corpus_Win20_cleaned_after020720 %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarise(total.n.Win20 = n())
+zoned_total.n.Win20 = right_join( data.frame(zoned.n.Win20), data.frame(total.n.Win20), by = c("ID"))
+zoned_total.n.Win20[is.na(zoned_total.n.Win20)]  = 0
+### calculating the perscentage of zoned out for those who replied for at least once for zoned out
+zoned_total.n.Win20$prop.zoned.Win20 = zoned_total.n.Win20$zoned.n.Win20/zoned_total.n.Win20$total.n.Win20
+
+suspiciousSubj.Win20 = zoned_total.n.Win20 %>%
+  mutate(mean.p.Win20 = mean(prop.zoned.Win20)) %>%    # mean = 0.1773978, sd = 0.1745668
+  mutate(over = mean.p.Win20+3*sd(prop.zoned.Win20)) %>%
+  filter(prop.zoned.Win20>over) %>%
+  .$ID ## 6 suspicious participants ### Participant 11  Participant 265 Participant 318 Participant 421 Participant 458 Participant 8  
+WI20_Susbicious = length(suspiciousSubj.Win20)
+
+###filter out those who responded no MORE than 9 prompts, which means no more than half
+noResponseSub.Win20 = total.n.Win20$ID[total.n.Win20[, 2]<=9]
+length(noResponseSub.Win20) ## 70 participants got filtered out because of no MORE than half responses
+noResponseSub.Win20
+
+badSubj.Win20 =c( as.character(noResponseSub.Win20), as.character(suspiciousSubj.Win20))
+WI20_FewPrompts = length(badSubj.Win20)## 76 participants were filtered out
+
+# filter out the bad subject(s)
+
+corpus_Win20_cleaned_after020720<- corpus_Win20_cleaned_after020720 %>%
+  filter(!ID %in% badSubj.Win20)
+N_WI20 = length(unique(corpus_Win20_cleaned_after020720$ID))### 380 after filtering
+##################
+zoned.n.spr20 <- Corpus_spring20_cleaned %>%
+  group_by(ID, Attention) %>%
+  dplyr::summarize(zoned.n.spr20 = n()) %>%
+  filter(Attention== "ZoneOut")
+
+
+total.n.spr20 <- Corpus_spring20_cleaned %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarize(total.n.spr20 = n())
+zoned_total.n.spr20 = right_join( data.frame(zoned.n.spr20), data.frame(total.n.spr20), by = c("ID"))
+zoned_total.n.spr20[is.na(zoned_total.n.spr20)]  = 0
+### calculating the perscentage of zoned out for those who replied for at least once for zoned out
+zoned_total.n.spr20$prop.zoned.spr20 = zoned_total.n.spr20$zoned.n.spr20/zoned_total.n.spr20$total.n.spr20
+
+suspiciousSubj.spr20 = zoned_total.n.spr20 %>%
+  mutate(mean.p.spr20 = mean(prop.zoned.spr20)) %>%    # mean = , sd = 
+  mutate(over = mean.p.spr20+3*sd(prop.zoned.spr20)) %>%
+  filter(prop.zoned.spr20>over) %>%
+  .$ID ## 6 suspicious participants ### Participant 103 Participant 325 Participant 47  Participant 520 Participant 69  Participant 71 
+SP20_Susbicious = length(suspiciousSubj.spr20)
+
+###filter out those who responded no MORE than 9 prompts, which means no more than half
+noResponseSub.spr20 = total.n.spr20$ID[total.n.spr20[, 2]<=9]
+length(noResponseSub.spr20) ## 74 participants got filtered out because of no MORE than half responses
+noResponseSub.spr20
+
+badSubj.spr20 =c( as.character(noResponseSub.spr20), as.character(suspiciousSubj.spr20))
+SP20_FewPrompts = length(badSubj.spr20)## 80 participants were filtered out
+
+# filter out the bad subject(s)
+
+Corpus_spring20_cleaned<- Corpus_spring20_cleaned %>%
+  filter(!ID %in% badSubj.spr20)
+### 421 after filtering
+```
+#Both
+```{r ImportCombinedCorpus, include=FALSE}
+#07272020 checked
+
+corpus_Win20_cleaned <- corpus_Win20_cleaned_after020720
+
+corpus_Win20_cleaned = add_column(corpus_Win20_cleaned,  season = "WI20", .before = "ID")
+
+Corpus_spring20_cleaned = add_column(Corpus_spring20_cleaned,  season = "SP20", .before = "ID")
+
+WinSp20_combined = rbind(corpus_Win20_cleaned, Corpus_spring20_cleaned)
+
+NeedFilterOut = WinSp20_combined[(WinSp20_combined$Attention == "AtPresent" & WinSp20_combined$Temporal_Speech !=0), ] # excluding those who said "at-present" for Attention Status, but not "at the present moment" for Temporal Status
+
+WinSp20_combined = setdiff(WinSp20_combined, NeedFilterOut )
+
+WinSp20_combined = WinSp20_combined %>% unite("SeasonID", season:ID, remove = FALSE)
+
+N = length(unique(WinSp20_combined$SeasonID)) # 801
+
+WinSp20_combined = subset(WinSp20_combined, select=-c(season,ID))# getting rid of ID and season column here to prevent confusion
+
+WinSp20_combined$NatureIfNoSpeech = as.character(WinSp20_combined$NatureIfNoSpeech)
+WinSp20_combined$SpeechNoSpeech = as.character(WinSp20_combined$SpeechNoSpeech)
+
+WinSp20_combined = WinSp20_combined %>% mutate(FullModality  = ifelse(SpeechNoSpeech == "NoSpeech", NatureIfNoSpeech, SpeechNoSpeech))
+
+WinSp20_combined$`Duration (in seconds)` = as.numeric( WinSp20_combined$`Duration (in seconds)`)
+
+start = mdy_hm(WinSp20_combined$`Start Date`, tz = "UTC")
+end = mdy_hm(WinSp20_combined$`End Date`, tz = "UTC")
+time.interval <- start %--% end
+time.duration <- as.duration(time.interval)
+
+median_finish = median(time.duration)
+
+sent = sapply(strsplit(as.character(WinSp20_combined$`Time Scheduled`), " -"), "[", 1)
+wait.interval <- mdy_hm(sent, tz = "UTC") %--% start
+wait.duration <- as.duration(wait.interval)
+median_wait = median(wait.duration)
+mean_wait = mean(wait.duration)
+
+```
+#Both
+```{r RecodingActivity, include=FALSE}
+#07272020 checked
+WinSp20_combined$Activity = dplyr::recode(WinSp20_combined$Activity,
+                                         `Commuting as a passenger in a vehicle`="Commuting",
+                                     `Daily self-care (e.g., brushing teeth, combing hair, etc.)`="Self-care",
+                                     ` Working at a job` = "Job",
+                                     `Walking somewhere while using a cell phone` = "Walking with phone",
+                                     `Taking care of pets`= "Pet-related",
+                                     `Taking care of children` = "Children-related",
+                                     `Socializing, but not currently talking to another person (e.g. party, celebration, social gathering)` = "Socializing",
+                                     `Sensual/sexual relations with another person` = "Sensual/Sexual",
+                                     `Participating in online activities, unrelated to entertainment (e.g. computer, internet, email, social media)` = "Online (not entertainment)",
+                                     `Having a conversation with a person (in person or through a device)` = "Conversation or Texting", 
+                           `Entertainment (e.g., watching a movie, TV show, video game, live sports game, theatre) (13)` =  "Entertainment")
+```
+#Both
+```{r ImportPreSurvey, include=FALSE}
+#07272020 checked
+PreSurvey_Winter20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Winter20.csv")
+
+PreSurvey_Spring20_raw = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/Pre_Survey_WinSp20/Raw Data_pre_survey/TYT_Pre_Spring20.csv")
+
+PreSurvey_WinSp20_raw = bind_rows(PreSurvey_Winter20_raw[-c(1:2),], PreSurvey_Spring20_raw[-c(1:2),])
+Demo_WinSp20 = PreSurvey_WinSp20_raw[, c("StudentID", "Age", "Gender", "Gender_3_TEXT", "Ethnoracial", "CollegeYear", "TransferStd", "Country_born", "Country_grown", "StateReside")]
+```
+#Both
+```{r ImportPID, include=FALSE}
+#07272020 checked
+
+PID_Match_Wi20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_after 020720.csv")[-c(1:3),c("Survey", "Question 5")]
+PID_Match_Sp20 = read_csv("/Users/guoxinqieve/Dropbox/track your thoughts/rewrite_TYT/TYT 2020_data/INSTRUCTION_ 040820.csv")[-c(1:3),c("Survey", "Question 5")]
+
+PID_Match_Wi20 = add_column(PID_Match_Wi20,  season = "WI20", .before = "Survey")
+PID_Match_Sp20 = add_column(PID_Match_Sp20,  season = "SP20", .before = "Survey")
+
+WinSp20_PID_match = bind_rows(PID_Match_Wi20, PID_Match_Sp20) %>% # combine winter and spring
+  unite("SeasonID", 1:2, na.rm = TRUE, remove = FALSE) # new column as more informative ID.
+
+```
+#Both
+```{r BigDf_CorpusDemoMatch, include=FALSE}
+#07272020 checked
+
+uniqueIDCorpus = as.data.frame(unique(WinSp20_combined$SeasonID))
+colnames(uniqueIDCorpus) = "SeasonID"
+MatchCorpus = left_join(uniqueIDCorpus,WinSp20_PID_match, by = "SeasonID")
+colnames(MatchCorpus)[colnames(MatchCorpus) =="Question 5"] = "StudentID"
+
+DemoMatchCorpus = left_join(Demo_WinSp20, MatchCorpus, by = "StudentID") %>%
+  filter(!is.na(SeasonID))
+DemoMatchCorpus = DemoMatchCorpus %>%
+  filter(is.na(Gender_3_TEXT)|Gender_3_TEXT!="testing")
+#length(unique(DemoMatchCorpus$SeasonID)) #here we only have the demo of 768 ppl, since some of them loss track during the process
+```
+#Both
+```{r DemoInfo, include=FALSE}
+#07272020 checked
+
+DemoMatchCorpus$Age = as.numeric(DemoMatchCorpus$Age)
+M_Age = mean(DemoMatchCorpus$Age, na.rm = T)
+SD_Age = sd(DemoMatchCorpus$Age, na.rm = T)
+Female_percentage = as.numeric(prop.table(table(DemoMatchCorpus$Gender))[1]*100)
+Male_percentage = as.numeric(prop.table(table(DemoMatchCorpus$Gender))[2]*100)
+Other_Percentage = 100 - Female_percentage - Male_percentage
+Asian_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[1]*100)
+Black_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[2]*100)
+Hispanic_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[3]*100)
+MidEast_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[4]*100)
+Mixed_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[5]*100)
+Native_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[6]*100)
+Haiwaii_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[7]*100)
+White_Percentage = as.numeric(prop.table(table(DemoMatchCorpus$Ethnoracial))[8]*100)
+```
+#Both
+```{r AttentionDistribution, include=FALSE}
+#08252020 these are for excluding the social interaction, the lines below can be deleted, if we don;t want this exclusion
+testing = WinSp20_combined %>% filter(SpeechNoSpeech=="ThinkOutLoud" & Activity =="Conversation or Texting")
+testingBig = dplyr::setdiff(WinSp20_combined, testing)
+WinSp20_combined = testingBig
+
+#08012020 checked
+N_prompts = nrow(WinSp20_combined)
+## Attention distribution by participants
+# zoned-out
+zoned_combined_20  <- WinSp20_combined %>%  
+  group_by(SeasonID, Attention) %>%
+  dplyr::summarize(zoned_combined_20  = n()) %>%
+  filter(Attention =="ZoneOut") ## indicate number of zoned-out prompts that this is AFTER filtering out the suspicious participants, so should be different from zoned.n and total.n
+
+total_combined_20  <- WinSp20_combined %>%
+  group_by(SeasonID) %>%
+  dplyr::summarize(total_combined_20  = n())
+
+zoned_total_combined_20 = right_join( data.frame(zoned_combined_20), data.frame(total_combined_20 ), by = c("SeasonID")) 
+## at-present 
+present.n_combined_20 <- WinSp20_combined %>%
+  group_by(SeasonID , Attention ) %>%
+  dplyr::summarise(present.n_combined_20 = n()) %>%
+  filter(Attention == "AtPresent")
+
+present_total_combined_20  = right_join( data.frame(present.n_combined_20), data.frame(total_combined_20 ), by = c("SeasonID"))
+
+## not-present 
+
+MW.n_combined_20  <- WinSp20_combined %>%
+  group_by(SeasonID , Attention ) %>%
+  dplyr::summarize(MW.n_combined_20  = n()) %>%
+  filter(Attention  == "NotPresent")
+
+names(MW.n_combined_20 )[1] = "SeasonID"
+MW_total_combined_20  = right_join( data.frame(MW.n_combined_20 ), data.frame(total_combined_20 ), by = c("SeasonID"))
+
+### 
+a <-full_join(present_total_combined_20 , MW_total_combined_20 , by = c("SeasonID"))
+b <-full_join(a, zoned_total_combined_20, by = c("SeasonID")) 
+c <- b[, c("present.n_combined_20", "MW.n_combined_20", "zoned_combined_20", "total_combined_20", "SeasonID")]
+
+c[is.na(c)] <- 0
+
+c$present.prob_combined_20 = c$present.n_combined_20/c$total_combined_20 
+c$MW.prob_combined_20 = c$MW.n_combined_20 /c$total_combined_20 
+c$zoned.prob_combined_20 = c$zoned_combined_20 /c$total_combined_20 
+
+Present_Percentage = mean(c$present.prob_combined_20)*100 # 0.6657747
+
+NotPresent_Percentage = mean(c$MW.prob_combined_20)*100 # 0.1584458
+
+ZonedOut_Percentage = mean(c$zoned.prob_combined_20)*100 # 0.1757795
+
+sd_Present_prob_combined_20 = sd(c$present.prob_combined_20)
+
+sd_NP_prob_combined_20 = sd(c$MW.prob_combined_20)
+
+sd_Zoned_prob_combined_20 = sd(c$zoned.prob_combined_20)
+
+d = as.data.frame(c[,1:3]) 
+
+Attention <-  as.data.frame(table(WinSp20_combined$Attention))
+
+chisq.test(Attention[2], p= c(1/3,1/3,1/3)) # X-squared =6063.1, df = 2, p-value < 2.2e-16
+
+# AveragePrompts = nrow(WinSp20_combined)/length(unique(WinSp20_combined$SeasonID))
+
+#chisq.test(
+ # c(mean(c$present.prob_combined_20)*AveragePrompts, mean(c$MW.prob_combined_20)*AveragePrompts, mean(c$zoned.prob_combined_20)*AveragePrompts), 
+#  p= c(1/3,1/3,1/3)) 
+
+# Chisqure = 6.1169, df = 2, p-value = 0.04696
+
+## changing the format of the data from wide to long => for plotting them in the attention distribution.
+AttentionProportion_w_to_L<- reshape(data= as.data.frame(c[,-c(1:4)]), idvar="SeasonID",
+                         varying = c("present.prob_combined_20","MW.prob_combined_20","zoned.prob_combined_20"),
+                         v.name=c("Prob.Attention"),
+                         times=c("present.prob_combined_20","MW.prob_combined_20","zoned.prob_combined_20"),
+                         new.row.names = 1:2403,
+                         direction="long")
+
+colnames(AttentionProportion_w_to_L)[2] = "Attention"
+
+
+AttentionProportion_w_to_L$Attention = dplyr::recode(AttentionProportion_w_to_L$Attention,
+'present.prob_combined_20' = "AtPresent", 'MW.prob_combined_20' = "NotPresent", 'zoned.prob_combined_20'="ZonedOut")
+
+
+AttentionDistribution <- ggplot(AttentionProportion_w_to_L, aes(x=Attention, y=Prob.Attention))+ geom_boxplot(fill='#E69F00')+xlab("Attention Status")+
+  ylab("")+ theme_bw() +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+```
+
+## chisq.test(Attention[2], p= c(1/3,1/3,1/3)) # X-squared =6063.1, df = 2, p-value < 2.2e-16
+## AttentionDistribution
+## M_Age = mean(DemoMatchCorpus$Age, na.rm = T)
+## SD_Age = sd(DemoMatchCorpus$Age, na.rm = T)
+## Female_percentage = as.numeric(prop.table(table(DemoMatchCorpus$Gender))[1]*100)
+
+# Paper 2 -- Updated For proposal
+```{r AttentionSpeechDistribution, include=FALSE}
+AttentionSpeech = as.data.frame(WinSp20_combined[, c("SeasonID", "Attention", "SpeechNoSpeech", "FullModality")]) %>%
+  filter(Attention!="ZoneOut") %>%
+   filter(!is.na(Attention)) %>%
+  filter(!is.na(SpeechNoSpeech))
+
+AttentionSpeech$SpeechNoSpeech = dplyr::recode(AttentionSpeech$SpeechNoSpeech, "ThinkOutLoud" = "PrivateSpeech")
+
+AttentionSpeechDistribution = ggplot(AttentionSpeech, aes(Attention, fill = SpeechNoSpeech)) + geom_bar(position = "fill")+ theme_bw() +scale_fill_manual( values=c( "#999999", "#E69F00", "#56B4E9") ) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold")) + ylab("Proportion")
+
+
+AttentionSpeechdf = as.data.frame(table(AttentionSpeech$Attention, AttentionSpeech$SpeechNoSpeech)) %>%
+  filter(Freq>0)
+
+
+AttentionSpeech_L_to_W<-reshape(data=AttentionSpeechdf,idvar ="Var1",
+                          v.names = "Freq",
+                          timevar = "Var2",
+                          direction="wide")
+
+AttentionSpeech_L_to_W_matrix = data.matrix(AttentionSpeech_L_to_W, rownames.force = NA)
+
+chisq.test(AttentionSpeech_L_to_W_matrix) # X-squared = 35.171, df = 3, p-value = 1.121e-07
+
+### using a logistic regression 
+SpeechTypeAndAttentionForChiSquare = WinSp20_combined %>%
+  filter(!is.na(SpeechNoSpeech)) %>%
+  filter(!is.na(Attention)) %>%
+  filter(Attention != "ZoneOut")
+
+SpeechTypeAndAttentionForChiSquare$Attention = as.factor(SpeechTypeAndAttentionForChiSquare$Attention)
+  
+UseSpeechPredictAttention = glmer(data= SpeechTypeAndAttentionForChiSquare, family = binomial(), Attention~ 1 +SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+UseNullPredictAttention = glmer(data= SpeechTypeAndAttentionForChiSquare, family = binomial(), Attention~ 1  + (1|SeasonID)+ (1|Activity))
+
+anova(UseNullPredictAttention, UseSpeechPredictAttention) #17.657      2  0.0001465 ***
+```
+
+# Paper 2 -- Updated For proposal
+```{r deleting NotPresent and ZoneOut, include=FALSE}
+WinSp20_combined = WinSp20_combined %>%
+  filter(Attention == "AtPresent")
+```
+# Paper 2 -- Updated For proposal
+```{r Clarity, include=FALSE}
+# 08012020 checked
+Clarity_Speech = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Clarity_Speech", "FullModality", "Control_Speech", "Valence_Speech")]) %>%
+  filter(!is.na(Clarity_Speech)) %>%
+  filter(Attention !="ZoneOut") 
+
+Clarity_NoSpeech = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Clarity_NoSpeech",  "FullModality", "Control_NoSpeech", "Valence_NoSpeech")]) %>%
+  filter(!is.na(Clarity_NoSpeech)) %>%
+  filter(Attention !="ZoneOut")
+
+colnames(Clarity_Speech)[5] = "Clarity"
+
+colnames(Clarity_NoSpeech)[5] = "Clarity"
+
+colnames(Clarity_Speech)[7] = "Control"
+
+colnames(Clarity_NoSpeech)[7] = "Control"
+
+colnames(Clarity_Speech)[8] = "Valence"
+
+colnames(Clarity_NoSpeech)[8] = "Valence"
+
+Clarity_combined = bind_rows(Clarity_Speech, Clarity_NoSpeech)
+######### this is just for proposal purpose, filtering out the non-speech prompts. 
+Clarity_combined = Clarity_combined %>%
+  filter(SpeechNoSpeech == "InnerSpeech" | SpeechNoSpeech == "ThinkOutLoud")
+
+Clarity_No_Attention = lmer(data= Clarity_combined, Clarity~ 1  + (1|SeasonID)+ (1|Activity))
+
+Clarity_Plus_Speech = lmer(data= Clarity_combined, Clarity~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Clarity_No_Attention,Clarity_Plus_Speech) 
+
+emmeans(Clarity_Plus_Speech,  "SpeechNoSpeech")
+
+
+pairs(emmeans(Clarity_Plus_Speech,  "SpeechNoSpeech"))
+
+### plotting the fixed effect coefficient
+###https://www.researchgate.net/post/How_can_I_plot_the_linear_estimated_relationship_between_the_response_variable_and_one_of_the_covariates_in_a_mixed_model_fitted_with_lme_in_R2
+#fm2 <- lmer(data= Clarity_combined, Clarity~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+#coef = fixef(fm2)
+#plot(Clarity~ SpeechNoSpeech ,data=Clarity_combined,col=SpeechNoSpeech)
+#abline(coef[1],coef[2],col=1) # distance ~ age for males
+# abline(coef[1],coef[2]+coef[3],col=2) # distance ~ age for females
+
+
+ggplot(Clarity_combined, aes(SpeechNoSpeech, Clarity, col = SpeechNoSpeech)) +
+    geom_boxplot() 
+
+# R for attention effect
+r.squaredGLMM(Clarity_Plus_Speech)[1] - r.squaredGLMM(Clarity_No_Attention)[1] # 0.005316893
+
+# partial eta square
+eta_sq(Clarity_Plus_Speech, partial = TRUE) # 0.007
+
+ Clarity_combined$SpeechNoSpeech = dplyr::recode(Clarity_combined$SpeechNoSpeech,'ThinkOutLoud' = "PrivateSpeech")
+
+model = lmer(data= Clarity_combined, Clarity~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+emmip(model, ~ SpeechNoSpeech ,  CIs = TRUE, type="response",  xlab = "Self-talk Type", ylab = "Estimated Clarity") + ylim( c(1, 7)) + theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+#x_Self_Speech <- emmip(Self_Speech_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response",  xlab = "Attention", ylab = "Self_Speech", main="Self_Speech by Speech Type and Attention")
+
+#Z_Self_Speech = x_Self_Speech+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ ylim( c(0, 1)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+```
+# Paper 2 -- Updated For proposal
+```{r ValenceSpeechNoSpeechComparison, include=FALSE}
+Valence_Speech = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Valence_Speech", "FullModality", "Control_Speech")]) %>%
+  filter(!is.na(Valence_Speech))
+
+Valence_NoSpeech = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Valence_NoSpeech", "FullModality", "Control_NoSpeech")]) %>%
+  filter(!is.na(Valence_NoSpeech))
+
+colnames(Valence_Speech)[5] = "Valence"
+
+colnames(Valence_NoSpeech)[5] = "Valence"
+
+colnames(Valence_Speech)[7] = "Control"
+
+colnames(Valence_NoSpeech)[7] = "Control"
+
+Valence_combined = bind_rows(Valence_Speech, Valence_NoSpeech)
+
+Valence_combined = Valence_combined %>%
+  filter(SpeechNoSpeech == "InnerSpeech" | SpeechNoSpeech == "ThinkOutLoud")
+
+Valence_No_Attention = lmer(data= Valence_combined, Valence~ 1 + (1|SeasonID)+ (1|Activity))
+
+Valence_Plus_Speech = lmer(data= Valence_combined, Valence~ 1 +SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Valence_No_Attention,Valence_Plus_Speech) # Chisq = 38.259      1  6.195e-10 ***
+
+
+Valence_combined$SpeechNoSpeech = dplyr::recode(Valence_combined$SpeechNoSpeech, 'ThinkOutLoud' = "PrivateSpeech")
+model = lmer(data= Valence_combined, Valence~ 1 +SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+emmip(model, ~ SpeechNoSpeech ,  CIs = TRUE, type="response",  xlab = "Self-talk Type", ylab = "Estimated Objective Pleasantess") + ylim( c(-3, 3))+theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+emmeans(Valence_Plus_Speech,  "SpeechNoSpeech")
+pairs(emmeans(Valence_Plus_Speech,  "SpeechNoSpeech"))
+
+ggplot(Valence_combined, aes(SpeechNoSpeech, Valence, col = SpeechNoSpeech)) +
+    geom_violin()
+# R for attention effect
+r.squaredGLMM(Valence_Plus_Speech)[1] - r.squaredGLMM(Valence_No_Attention)[1]
+
+# partial eta square
+eta_sq(Valence_Plus_Speech, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r ControlSpeechNoSpeechComparison, include=FALSE}
+Control_Speech = as.data.frame( WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Control_Speech", "FullModality")] ) %>%
+  filter(!is.na(Control_Speech))
+
+Control_NoSpeech = as.data.frame(WinSp20_combined[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech",  "Control_NoSpeech", "FullModality")]) %>%
+  filter(!is.na(Control_NoSpeech))
+
+colnames(Control_Speech)[5] = "Control"
+
+colnames(Control_NoSpeech)[5] = "Control"
+
+Control_combined = bind_rows(Control_Speech, Control_NoSpeech)
+
+Control_combined = Control_combined %>%
+  filter(Attention!="ZoneOut") %>%
+  filter(SpeechNoSpeech == "InnerSpeech" | SpeechNoSpeech == "ThinkOutLoud")
+
+Control_combined$Control = as.factor(Control_combined$Control)
+
+Control_No_Attention_Speech = glmer(data= Control_combined, family = binomial(), Control~ 1  + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Plus_Speech = glmer(data= Control_combined, family = binomial(), Control~ 1 +SpeechNoSpeech + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+anova(Control_No_Attention_Speech, Control_Plus_Speech) #  Chisq = 33.933      1  5.705e-09 ***
+
+ggplot(Control_combined, aes(SpeechNoSpeech, Control, col = SpeechNoSpeech)) +
+    geom_violin()
+
+plot_model(Control_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Control by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans_control_SpeechContrast =emmeans(Control_Plus_Speech,  "SpeechNoSpeech")
+pairs(emmeans(Control_Plus_Speech,  "SpeechNoSpeech"))
+
+probability_Logit_TOL_control = exp(2.21) / (1 + exp(2.21))
+probability_Logit_IS_control = exp(1.48) / (1 + exp(1.48))
+
+# R for attention effect
+r.squaredGLMM(Control_Plus_Speech)[1] - r.squaredGLMM(Control_No_Attention_Speech)[1]
+
+# partial eta square
+eta_sq(Control_Plus_Speech, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r MomentaryWellBeing, include=FALSE}
+Feeling_PandNP = as.data.frame(WinSp20_combined[, c("Attention","Feeling_PandNP","Activity", "SpeechNoSpeech","SeasonID","FullModality", "Control_Speech", "Control_NoSpeech")]) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Feeling_PandNP)) %>%
+  filter(!is.na(SpeechNoSpeech)) %>%
+  filter(SpeechNoSpeech == "InnerSpeech" | SpeechNoSpeech == "ThinkOutLoud")
+
+Feeling_No_Attention_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1  + (1|SeasonID)+ (1|Activity))
+
+Feeling_Plus_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1  + SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+anova(Feeling_No_Attention_Speech, Feeling_Plus_Speech) # Chi2 = 31.501      1  1.993e-08 ***
+
+ggplot(Feeling_PandNP, aes(SpeechNoSpeech, Feeling_PandNP, col = SpeechNoSpeech)) +
+    geom_violin()
+
+
+emmeans(Feeling_Plus_Speech,  "SpeechNoSpeech")
+
+pairs(emmeans(Feeling_Plus_Speech,  "SpeechNoSpeech"))
+
+# R for attention effect
+r.squaredGLMM(Feeling_Plus_Speech)[1] - r.squaredGLMM(Feeling_No_Attention_Speech)[1]
+
+# partial eta square
+eta_sq(Feeling_Plus_Speech, partial = TRUE)
+
+Feeling_PandNP$SpeechNoSpeech = dplyr::recode(Feeling_PandNP$SpeechNoSpeech, 'ThinkOutLoud' = "PrivateSpeech")
+model = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1  + SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+emmip(model, ~ SpeechNoSpeech ,  CIs = TRUE, type="response",  xlab = "Self-talk Type", ylab = "Estimated Well-being") + ylim( c(-3, 3))+theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+```
+# Paper 2 -- built for proposal
+```{r building a cortable for clarity, valence and well-being, include=FALSE}
+
+library(corrplot)
+ValenceClarityWB_SpeechType_df_For_cor = WinSp20_combined
+ValenceClarityWB_SpeechType_df_For_cor$SpeechNoSpeech = dplyr::recode(WinSp20_combined$SpeechNoSpeech, 'ThinkOutLoud' = 1, 'InnerSpeech' = 0, 'NoSpeech' = NULL)
+
+res1 <- cor.mtest(na.omit(cbind(WellBeing = ValenceClarityWB_SpeechType_df_For_cor$Feeling_PandNP, 
+                        Pleasantness = ValenceClarityWB_SpeechType_df_For_cor$Valence_Speech,
+                        Clarity = ValenceClarityWB_SpeechType_df_For_cor$Clarity_Speech,
+                        ThinkOutLoud = ValenceClarityWB_SpeechType_df_For_cor$SpeechNoSpeech)), conf.level = .95)
+
+M = cor(na.omit(cbind(WellBeing = ValenceClarityWB_SpeechType_df_For_cor$Feeling_PandNP, 
+                        Pleasantness = ValenceClarityWB_SpeechType_df_For_cor$Valence_Speech,
+                        Clarity = ValenceClarityWB_SpeechType_df_For_cor$Clarity_Speech,
+                        ThinkOutLoud = ValenceClarityWB_SpeechType_df_For_cor$SpeechNoSpeech)))
+
+corrplot.mixed(M, p.mat = res1$p, insig = "label_sig", pch.col = "white", pch = "p<.05", pch.cex = .5, order = "AOE", lower.col = "black", number.cex = .9)
+
+
+corrplot.mixed(M, lower.col = "black", number.cex = .7)
+
+
+
+```
+# Paper 2 -- built for proposal
+```{r model-comparison - when using speechnospeech to predict well-being, include=FALSE}
+forComparison = WinSp20_combined %>% 
+  filter(!is.na(Valence_Speech)) %>%
+  filter(SpeechNoSpeech !="NoSpeech")
+
+ModelNull = lmer(data = forComparison, Feeling_PandNP ~ 1  + (1|SeasonID)+ (1|Activity))
+
+ModelValence = lmer(data = forComparison, Feeling_PandNP ~ 1  + Valence_Speech+ (1|SeasonID)+ (1|Activity))
+
+ModelValenceClarity = lmer(data = forComparison, Feeling_PandNP ~ 1  + Valence_Speech+Clarity_Speech+ (1|SeasonID)+ (1|Activity))
+
+ModelValenceClaritySelfTalk = lmer(data = forComparison, Feeling_PandNP ~ 1  + Valence_Speech+Clarity_Speech+ SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+#ModelValenceSelfTalk = lmer(data = forComparison, Feeling_PandNP ~ 1  + Valence_Speech+ SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+
+anova(ModelNull,ModelValence)
+
+anova(ModelValenceClarity,ModelValence)
+
+anova(ModelValenceClarity, ModelValenceClaritySelfTalk)
+# anova(ModelValenceSelfTalk, ModelValence)
+
+eta_sq(ModelValenceClaritySelfTalk, partial = TRUE)
+
+r.squaredGLMM(ModelValenceClaritySelfTalk)[1] - r.squaredGLMM(ModelValenceClarity)[1]
+
+r.squaredGLMM(ModelValenceClarity)[1] - r.squaredGLMM(ModelValence)[1]
+
+r.squaredGLMM(ModelValence)[1] - r.squaredGLMM(ModelNull)[1]
+
+#r.squaredGLMM(ModelValenceSelfTalk)[1] - r.squaredGLMM(ModelValence)[1]
+
+plot_model(ModelValenceClaritySelfTalk, SpeechNoSpeech ~ Clarity|Valence_Speech,  CIs = TRUE, type="pred",  xlab = "", ylab = "Estimated Well-being") 
+
+
+```
+
+
+
+# Paper 2 -- Updated For proposal
+```{r Self-Related, include=FALSE}
+Self_Speech =  as.data.frame(WinSp20_combined[,c ("Self_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Control_Speech", "Valence_Speech")]) %>% 
+  filter(!is.na(Self_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID)) 
+
+table(Self_Speech$Self_Speech)
+
+Self_Speech$Self_Speech = as.factor(Self_Speech$Self_Speech)
+
+Self_Speech_No_Attention_Speech = glmer(data= Self_Speech, family = binomial(), 
+                                Self_Speech~ 1  + (1|SeasonID)+ (1|Activity))
+
+Self_Speech_Plus_Speech = glmer(data= Self_Speech, family = binomial(), 
+                                Self_Speech~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Self_Speech_No_Attention_Speech, Self_Speech_Plus_Speech) # 19.406      1  1.057e-05 ***
+
+plot_model(Self_Speech_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Self_Speech by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans(Self_Speech_Plus_Speech,  "SpeechNoSpeech")
+
+
+pairs(emmeans(Self_Speech_Plus_Speech,  "SpeechNoSpeech"))
+
+probability_Logit_TOL_self = exp(0.586) / (1 + exp(0.586))
+probability_Logit_IS_self = exp(1.024) / (1 + exp(1.024))
+
+# R for attention effect
+r.squaredGLMM(Self_Speech_Plus_Speech)[1] - r.squaredGLMM(Self_Speech_No_Attention_Speech)[1]
+
+# partial eta square
+eta_sq(Self_Speech_Plus_Speech, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r imporance, include=FALSE}
+Importance_Speech =  as.data.frame(WinSp20_combined[,c ("Importance_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech","Control_Speech", "Valence_Speech")]) %>% 
+  filter(!is.na(Importance_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Importance_Speech$Importance_Speech)
+
+Importance_Speech$Importance_Speech = as.numeric(Importance_Speech$Importance_Speech)
+
+Importance_Speech_No_Attention_Speech = lmer(data= Importance_Speech, 
+                                Importance_Speech~ 1 + (1|SeasonID)+ (1|Activity))
+
+Importance_Speech_Plus_Speech = lmer(data= Importance_Speech, 
+                                Importance_Speech~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Importance_Speech_No_Attention_Speech, Importance_Speech_Plus_Speech) #  0.0578      1       0.81
+
+
+ggplot(Importance_Speech, aes(SpeechNoSpeech, Importance_Speech, col = SpeechNoSpeech)) +
+    geom_violin()
+
+emmeans(Importance_Speech_Plus_Speech,  "SpeechNoSpeech")
+
+pairs(emmeans(Importance_Speech_Plus_Speech,  "SpeechNoSpeech"))
+
+# R for attention effect
+r.squaredGLMM(Importance_Speech_Plus_Speech)[1] - r.squaredGLMM(Importance_Speech_No_Attention_Speech)[1]
+
+# partial eta square
+eta_sq(Importance_Speech_Plus_Speech, partial = TRUE)
+```
+
+```{r Reaction, include=FALSE}
+Reaction_Speech =  as.data.frame(WinSp20_combined[,c ("Reaction_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech","Control_Speech", "Valence_Speech")]) %>% 
+  filter(!is.na(Reaction_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Reaction_Speech$Reaction_Speech)
+
+Reaction_Speech$Reaction_Speech = as.numeric(Reaction_Speech$Reaction_Speech)
+
+Reaction_Speech_No_Attention_Speech = lmer(data= Reaction_Speech, 
+                                Reaction_Speech~ 1 + (1|SeasonID)+ (1|Activity))
+
+Reaction_Speech_Plus_Speech = lmer(data= Reaction_Speech, 
+                                 Reaction_Speech~ 1 + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Reaction_Speech_No_Attention_Speech, Reaction_Speech_Plus_Speech) #  19.733      1  8.905e-06 ***
+
+ggplot(Reaction_Speech, aes(SpeechNoSpeech, Reaction_Speech, col = SpeechNoSpeech)) +
+    geom_violin()
+
+emmeans(Reaction_Speech_Plus_Speech,  "SpeechNoSpeech")
+
+pairs(emmeans(Reaction_Speech_Plus_Speech,  "SpeechNoSpeech"))
+
+
+# R for attention effect
+r.squaredGLMM(Reaction_Speech_Plus_Speech)[1] - r.squaredGLMM(Reaction_Speech_No_Attention_Speech)[1]
+
+# partial eta square
+eta_sq(Reaction_Speech_Plus_Speech, partial = TRUE)
+```
+
+# Paper 2 -- Updated For proposal
+```{r temporal, include=FALSE}
+Temporal_Speech =  as.data.frame(WinSp20_combined[,c ("Temporal_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Valence_Speech", "Control_Speech")]) %>% 
+  filter(!is.na(Temporal_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Temporal_Speech$Temporal_Speech)
+
+Temporal_Speech$Temporal_Speech = as.numeric(Temporal_Speech$Temporal_Speech)
+
+Temporal_Speech_No_Attention_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Null_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Plus_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + Attention + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Full_Speech = lmer(data= Temporal_Speech,Temporal_Speech~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Temporal_Speech_No_Attention_Speech, Temporal_Speech_Null_Speech) #  0.7815      1     0.3767
+anova(Temporal_Speech_Null_Speech, Temporal_Speech_Plus_Speech) #   5.8434      1    0.01564 *
+anova(Temporal_Speech_Plus_Speech, Temporal_Speech_Full_Speech) # 0.0835      1     0.7726
+
+emmeans(Temporal_Speech_Full_Speech,  "SpeechNoSpeech")
+
+#SpeechNoSpeech emmean     SE    df lower.CL upper.CL
+# InnerSpeech      5.18 0.0258 Inf      5.13      5.23
+# ThinkOutLoud     5.03 0.0546 Inf      4.92      5.14
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: kenward-roger 
+#ConfSeasonIDence level used: 0.95 
+pairs(emmeans(Temporal_Speech_Full_Speech,  "SpeechNoSpeech"))
+# contrast                   estimate    SE   df t.ratio p.value
+# InnerSpeech - ThinkOutLoud    0.152 0.0576 Inf 2.631   0.0085 
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: kenward-roger
+
+
+pairs(emmeans(Temporal_Speech_Full_Speech, ~  SpeechNoSpeech| Attention, type="response"))
+
+#Attention = AtPresent:
+#  contrast                   estimate     SE   df t.ratio p.value
+#InnerSpeech - ThinkOutLoud    0.104 0.0431 Inf 2.423   0.0154 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - ThinkOutLoud    0.199 0.1063 Inf 1.870   0.0615 
+
+#Degrees-of-freedom method: kenward-roger 
+
+emmip(Temporal_Speech_Full_Speech, SpeechNoSpeech ~  Attention,style = "factor")
+
+
+x_Temporal_Speech <- emmip(Temporal_Speech_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Temporal_Speech", main="Temporal_Speech by Speech Type and Attention")
+
+Z_Temporal_Speech = x_Temporal_Speech+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#56B4E9") )+ ylim( c(1, 10)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+###### 
+ ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth=1)
+
+ ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+  
+ ggplot(Temporal_Speech %>%
+          filter(Attention =="AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+   
+ ggplot(Temporal_Speech %>%
+          filter(Attention =="NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+ 
+ #### replying to Karen 0423: 4 graphs (2 attention*2 speech)
+  Temporal_ThinkOutLoud_AtPresent = ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud" & Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1) + ggtitle("ThinkOutLoud & AtPresent")
+  
+Temporal_ThinkOutLoud_NotPresent=  ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("ThinkOutLoud & NotPresent")
+  
+Temporal_InnerSpeech_AtPresent=   ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech" & Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & AtPresent")
+  
+ Temporal_InnerSpeech_NotPresent= ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & NotPresent")
+  
+  #####
+Temporal_AtPresent = gridExtra::grid.arrange(Temporal_ThinkOutLoud_AtPresent, Temporal_ThinkOutLoud_NotPresent, nrow=1)
+Temporal_NotPresent = gridExtra::grid.arrange(Temporal_InnerSpeech_AtPresent, Temporal_InnerSpeech_NotPresent, nrow=1)
+Temporal2by2 = rbind(Temporal_AtPresent, Temporal_NotPresent, size = "first")
+Temporal2by2$widths <- unit.pmax(Temporal_AtPresent$widths, Temporal_NotPresent$widths)
+grid.newpage()
+grid.draw(Temporal2by2)
+
+# R for attention effect
+r.squaredGLMM(Temporal_Speech_Null_Speech)[1] - r.squaredGLMM(Temporal_Speech_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Temporal_Speech_Plus_Speech)[1] - r.squaredGLMM(Temporal_Speech_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Temporal_Speech_Full_Speech)[1] - r.squaredGLMM(Temporal_Speech_Plus_Speech)[1]
+# partial eta square
+eta_sq(Temporal_Speech_Full_Speech, partial = TRUE)
+
+
+```
+# Paper 2 -- Updated For proposal
+```{r RespondingKarenCommentsAfterSBB041420, include=FALSE}
+## dataframe c has the distribution for all three kinds of attention states
+View(c)
+## Plot that shows number of people as a function of % of present prompt
+PresentFrequencyHistogram <- ggplot(c,  aes(x=present.prob_combined_20))+
+  geom_histogram(binwidth = 0.05)+
+    ggtitle('How Frequent Are People At-Present \n Histogram')+
+  scale_x_continuous('Percentage of Present Prompt', breaks=seq(0,1, by=0.1))+
+  theme_minimal()
+PresentFrequencyDensity <- ggplot(c, aes(x=present.prob_combined_20))+
+ geom_density(fill='gray', alpha=0.5)+
+ ggtitle('How Frequent Are People At-Present \n Density')+
+ scale_x_continuous('Percentage of Present Prompt', breaks=seq(0,1, by=0.1))+
+ theme_minimal()
+gridExtra::grid.arrange(PresentFrequencyHistogram, PresentFrequencyDensity, nrow=1)
+
+# Plot that shows number of people as a function of % of TOL prompt
+# TOL
+TOL_combined_20  <- WinSp20_combined %>%  
+  filter(!is.na(Attention)) %>%
+  group_by(SeasonID, FullModality) %>%
+  dplyr::summarize(TOL_combined_20  = n()) #%>%
+#  filter(SpeechNoSpeech =="ThinkOutLoud")
+
+total_combined_20  <- WinSp20_combined %>%
+  group_by(SeasonID) %>%
+  dplyr::summarize(total_combined_20  = n())
+
+TOL_total_combined_20 = right_join( data.frame(TOL_combined_20), data.frame(total_combined_20 ), by = c("SeasonID")) 
+TOL_total_combined_20$TOL_combined_20[is.na(TOL_total_combined_20$TOL_combined_20)] =0
+TOL_total_combined_20$TOL_combined_20.prob = TOL_total_combined_20$TOL_combined_20/TOL_total_combined_20$total_combined_20
+
+TOLFrequencyHistogram <- ggplot(TOL_total_combined_20,  aes(x=TOL_combined_20.prob))+
+  geom_histogram(binwidth = 0.05)+
+    ggtitle('How Frequent Do People TOL \n Histogram')+
+  scale_x_continuous('Percentage of TOL Prompt', breaks=seq(0,1, by=0.1))+
+  theme_minimal()
+TOLFrequencyDensity <- ggplot(TOL_total_combined_20, aes(x=TOL_combined_20.prob))+
+ geom_density(fill='gray', alpha=0.5)+
+ ggtitle('Percentage of TOL Prompt \n Density')+
+ scale_x_continuous('Percentage of TOL Prompt', breaks=seq(0,1, by=0.1))+
+ theme_minimal()
+gridExtra::grid.arrange(TOLFrequencyHistogram, TOLFrequencyDensity, nrow=1)
+
+TOLFrequencyDensity <- ggplot(TOL_total_combined_20, aes(x = TOL_combined_20.prob, color =  FullModality))+
+    geom_density(alpha=0.5)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9", "black", "red", "blue4", "purple", "darkgreen", "tomato4")) +
+    ggtitle('Percentage of TOL Prompt - Density')+
+    scale_x_continuous('Percentage of TOL Prompt', breaks=seq(0,1, by=0.1))+
+    theme_minimal()
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Clarity, include=FALSE}
+NoTOL_SeasonID = TOL_total_combined_20 %>% 
+  filter(FullModality == "ThinkOutLoud") %>%
+    .$SeasonID 
+#  filter(TOL_combined_20.prob==0) %>%
+
+length(unique(NoTOL_SeasonID)) # 338
+  
+No_zeroTOL_Corpus<- WinSp20_combined %>%
+  filter(!SeasonID %in% NoTOL_SeasonID)
+
+####### the step that trying to figure out if zero TOL people and non-zero TOL people are demographical different. 
+Not_zeroTOL_SeasonID = TOL_total_combined_20 %>% 
+  filter(!SeasonID %in% NoTOL_SeasonID) %>%
+  .$SeasonID ## getting ID for not zero TOL
+length(unique(Not_zeroTOL_SeasonID))
+
+# matching the ID from corpus with Demo information.
+zeroTOL_demo_Corpus = DemoMatchCorpus %>%
+  filter(SeasonID %in% NoTOL_SeasonID) 
+No_zeroTOL_demo_Corpus = DemoMatchCorpus %>%
+  filter(SeasonID %in% Not_zeroTOL_SeasonID) 
+## comparing if the age between TOL people and zero TOL people differ, similarly, gender, race were tested.
+t.test(zeroTOL_demo_Corpus$Age, No_zeroTOL_demo_Corpus$Age)
+
+chisq.test(table(zeroTOL_demo_Corpus$Gender[zeroTOL_demo_Corpus$Gender == c("Female", "Male")]),table(No_zeroTOL_demo_Corpus$Gender[No_zeroTOL_demo_Corpus$Gender == c("Female", "Male")]) )
+
+zeroTOL_demo_Corpus_filteringOutSmallCategory = zeroTOL_demo_Corpus %>%
+  filter(Ethnoracial != "Native American/Alaskan Native" & Ethnoracial != "Native Hawaiian or Other Pacific Islander") # this is because these two groups have zero participants in the zero TOL group so that it makes the categories imbalance. they were deleated for chisquare
+chisq.test(table(zeroTOL_demo_Corpus_filteringOutSmallCategory$Ethnoracial),prop.table(table(No_zeroTOL_demo_Corpus$Ethnoracial))) 
+
+
+####
+Clarity_Speech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Clarity_Speech", "FullModality")]) %>%
+  filter(!is.na(Clarity_Speech))
+
+Clarity_NoSpeech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Clarity_NoSpeech", "FullModality")]) %>%
+  filter(!is.na(Clarity_NoSpeech))
+
+colnames(Clarity_Speech)[5] = "Clarity"
+
+colnames(Clarity_NoSpeech)[5] = "Clarity"
+
+Clarity_combined = bind_rows(Clarity_Speech, Clarity_NoSpeech) %>%
+  filter(!Attention == "ZoneOut")
+
+Clarity_No_Attention_Speech = lmer(data= Clarity_combined, Clarity~ 1  + (1|SeasonID)+ (1|Activity))
+
+Clarity_Null_Speech = lmer(data= Clarity_combined, Clarity~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Clarity_Plus_Speech = lmer(data= Clarity_combined, Clarity~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Clarity_Plus_FullModality = lmer(data= Clarity_combined, Clarity~ 1 + Attention+FullModality + (1|SeasonID)+ (1|Activity))
+
+Clarity_Full_FullModality = lmer(data= Clarity_combined, Clarity~ 1 + Attention*FullModality + (1|SeasonID)+ (1|Activity))
+
+
+Clarity_Full_Speech = lmer(data= Clarity_combined, Clarity~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Clarity_No_Attention_Speech, Clarity_Null_Speech) # Chisq = 141.47      1  < 2.2e-16 ***
+anova(Clarity_Null_Speech, Clarity_Plus_Speech) # Chisq = 166.81      2  < 2.2e-16 ***
+anova(Clarity_Plus_Speech, Clarity_Full_Speech) #  6.172      2    0.04568 *
+
+# plot_model(Clarity_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Clarity by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans(Clarity_Full_Speech,  "SpeechNoSpeech")
+# SpeechNoSpeech emmean     SE  df lower.CL upper.CL
+# InnerSpeech      4.68 0.0544 Inf      4.57      4.78
+# NoSpeech         4.22 0.0553 Inf      4.11      4.32
+# ThinkOutLoud     4.74 0.0740 Inf      4.59      4.88
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: asymptotic 
+#ConfSeasonIDence level used: 0.95 
+
+ pairs(emmeans(Clarity_Full_Speech,  "SpeechNoSpeech"))
+# contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - NoSpeech       0.4628 0.0472 Inf  9.805  <.0001 
+# InnerSpeech - ThinkOutLoud  -0.0576 0.0678 Inf -0.850  0.6718 
+# NoSpeech - ThinkOutLoud     -0.5204 0.0684 Inf -7.612  <.0001 
+
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: asymptotic 
+# P value adjustment: tukey method for comparing a family of 3 estimates 
+ 
+ ### plotting the interaction
+ 
+emmeans(Clarity_Full_Speech,    ~  SpeechNoSpeech |Attention)
+# Attention = AtPresent:
+#  InnerSpeech      4.93 0.0525 Inf      4.83      5.03
+# NoSpeech         4.48 0.0546 Inf      4.37      4.58
+# ThinkOutLoud     5.18 0.0617 Inf      5.06      5.30
+
+#Attention = NotPresent:
+# SpeechNoSpeech emmean     SE  df asymp.LCL asymp.UCL
+# InnerSpeech      4.42 0.0724 Inf      4.28      4.57
+# NoSpeech         3.95 0.0734 Inf      3.81      4.10
+# ThinkOutLoud     4.29 0.1198 Inf      4.06      4.53
+
+pairs(emmeans(Clarity_Full_Speech,    ~  SpeechNoSpeech| Attention))
+# Attention = AtPresent:
+#contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - NoSpeech        0.454 0.0441 Inf  10.289 <.0001 
+# InnerSpeech - ThinkOutLoud   -0.246 0.0517 Inf  -4.752 <.0001 
+# NoSpeech - ThinkOutLoud      -0.700 0.0541 Inf -12.937 <.0001 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - NoSpeech        0.472 0.0817 Inf   5.768 <.0001 
+# InnerSpeech - ThinkOutLoud    0.130 0.1250 Inf   1.042 0.5505 
+# NoSpeech - ThinkOutLoud      -0.341 0.1249 Inf  -2.731 0.0174 
+
+ 
+#Degrees-of-freedom method: asymptotic 
+#P value adjustment: tukey method for comparing a family of 3 estimates 
+
+x_clarity <- emmip(Clarity_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Clarity", main="Clarity by Speech Type and Attention")
+
+Z_clarity = x_clarity+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color = SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+x_clarity_FullModality <- emmip(Clarity_Full_FullModality, FullModality ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Clarity", main="Clarity by Speech Type and Attention")
+
+Z_clarity_FullModality = x_clarity_FullModality+ theme_bw() +aes(linetype = FullModality, color = FullModality)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9", "black", "red", "blue4", "purple", "darkgreen", "tomato4") )+ylim(c(1, 7)) +theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+
+#### Comparing Inner speech with Priavte speech
+Clarity_No_Attention_OnlySpeech = lmer(data= Clarity_Speech, Clarity~ 1  + (1|SeasonID)+ (1|Activity))
+
+Clarity_Null_OnlySpeech = lmer(data= Clarity_Speech, Clarity~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Clarity_Plus_OnlySpeech = lmer(data= Clarity_Speech, Clarity~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Clarity_Full_OnlySpeech = lmer(data= Clarity_Speech, Clarity~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Clarity_No_Attention_OnlySpeech, Clarity_Null_OnlySpeech) # 100.17      1  < 2.2e-16
+anova(Clarity_Null_OnlySpeech, Clarity_Plus_OnlySpeech) #11.004      2   0.004079 **
+anova(Clarity_Plus_OnlySpeech, Clarity_Full_OnlySpeech) # 2.5398      1      0.111
+r.squaredGLMM(Clarity_Plus_OnlySpeech)[1] - r.squaredGLMM(Clarity_Full_OnlySpeech)[1]
+
+
+##### Comparing Inner Speech with No speech
+Clarity_NoTOL =  Clarity_combined %>%
+  filter(!SpeechNoSpeech == "ThinkOutLoud")
+
+Clarity_No_Attention_NoTOL = lmer(data= Clarity_NoTOL, Clarity~ 1 + (1|SeasonID)+ (1|Activity))
+
+Clarity_Null_NoTOL = lmer(data= Clarity_NoTOL, Clarity~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Clarity_Plus_NoTOL = lmer(data= Clarity_NoTOL, Clarity~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Clarity_Full_NoTOL = lmer(data= Clarity_NoTOL, Clarity~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Clarity_No_Attention_NoTOL, Clarity_Null_NoTOL) #Chisq = 101.48      1  < 2.2e-16 ***
+anova(Clarity_Null_NoTOL, Clarity_Plus_NoTOL) # Chisq =  123.62      1  < 2.2e-16 ***
+anova(Clarity_Plus_NoTOL, Clarity_Full_NoTOL) # 0.0149      1     0.9028
+
+# R for attention effect
+r.squaredGLMM(Clarity_Null_Speech)[1] - r.squaredGLMM(Clarity_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Clarity_Plus_Speech)[1] - r.squaredGLMM(Clarity_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Clarity_Full_Speech)[1] - r.squaredGLMM(Clarity_Plus_Speech)[1]
+# partial eta square
+eta_sq(Clarity_Full_Speech, partial = TRUE)
+
+# R for attention effect
+ r.squaredGLMM(Clarity_Null_OnlySpeech)[1] - r.squaredGLMM(Clarity_No_Attention_OnlySpeech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Clarity_Plus_OnlySpeech)[1] - r.squaredGLMM(Clarity_Null_OnlySpeech)[1]
+ #R for interaction effect
+r.squaredGLMM(Clarity_Full_OnlySpeech)[1] - r.squaredGLMM(Clarity_Plus_OnlySpeech)[1]
+# partial eta square
+eta_sq(Clarity_Full_OnlySpeech, partial = TRUE)
+
+#R for interaction effect
+r.squaredGLMM(Clarity_Plus_NoTOL)[1] - r.squaredGLMM(Clarity_Full_NoTOL)[1]
+# R for attention effect
+ r.squaredGLMM(Clarity_Null_NoTOL)[1] - r.squaredGLMM(Clarity_No_Attention_NoTOL)[1]
+ # R for Experience type effect
+ r.squaredGLMM(Clarity_No_Attention_NoTOL)[1] - r.squaredGLMM(Clarity_Plus_NoTOL)[1]
+# partial eta square
+eta_sq(Clarity_Full_NoTOL, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Valence, include=FALSE}
+Valence_Speech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Valence_Speech")]) %>%
+  filter(!is.na(Valence_Speech))
+
+Valence_NoSpeech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Valence_NoSpeech")]) %>%
+  filter(!is.na(Valence_NoSpeech))
+
+colnames(Valence_Speech)[5] = "Valence"
+
+colnames(Valence_NoSpeech)[5] = "Valence"
+
+Valence_combined = bind_rows(Valence_Speech, Valence_NoSpeech)
+
+Valence_No_Attention_Speech = lmer(data= Valence_combined, Valence~ 1 + (1|SeasonID)+ (1|Activity))
+
+Valence_Null_Speech = lmer(data= Valence_combined, Valence~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Valence_Plus_Speech = lmer(data= Valence_combined, Valence~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Valence_Full_Speech = lmer(data= Valence_combined, Valence~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Valence_No_Attention_Speech, Valence_Null_Speech) # Chisq =117.01      1  < 2.2e-16 ***
+anova(Valence_Null_Speech, Valence_Plus_Speech) # Chisq = 23.782      2  6.853e-06 ***
+anova(Valence_Plus_Speech, Valence_Full_Speech) # Chisq = 9.5504      2   0.008436 **
+
+plot_model(Valence_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Valence by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans(Valence_Full_Speech,  "SpeechNoSpeech")
+pairs(emmeans(Valence_Full_Speech,  "SpeechNoSpeech"))
+ 
+# SpeechNoSpeech emmean     SE    df lower.CL upper.CL
+# InnerSpeech     0.361 0.0709 Inf     0.222     0.500
+# NoSpeech        0.577 0.0716 Inf     0.437     0.717
+# ThinkOutLoud    0.505 0.0848 Inf     0.339     0.671
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: asymptotic 
+#ConfSeasonIDence level used: 0.95 
+ 
+# contrast                   estimate     SE   df t.ratio p.value
+#  InnerSpeech - NoSpeech      -0.2158 0.0438 Inf -4.927  <.0001 
+# InnerSpeech - ThinkOutLoud  -0.1440 0.0631 Inf -2.282  0.0584 
+# NoSpeech - ThinkOutLoud      0.0718 0.0637 Inf  1.126  0.4979 
+
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: asymptotic 
+#P value adjustment: tukey method for comparing a family of 3 estimates 
+ 
+ 
+emmeans(Valence_Full_Speech, ~  SpeechNoSpeech |Attention)
+# Attention = AtPresent:
+#  InnerSpeech     0.594 0.0695 Inf    0.4582     0.731
+# NoSpeech        0.766 0.0710 Inf    0.6272     0.906
+# ThinkOutLoud    0.888 0.0757 Inf    0.7394     1.036
+
+#Attention = NotPresent:
+# SpeechNoSpeech emmean     SE  df asymp.LCL asymp.UCL
+# InnerSpeech     0.128 0.0837 Inf   -0.0361     0.292
+# NoSpeech        0.388 0.0847 Inf    0.2217     0.554
+# ThinkOutLoud    0.123 0.1219 Inf   -0.1161     0.362
+
+#Degrees-of-freedom method: asymptotic 
+#ConfSeasonIDence level used: 0.95 
+pairs(emmeans(Valence_Full_Speech, ~  SpeechNoSpeech| Attention))
+
+#Attention = AtPresent:
+# contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - NoSpeech     -0.17189 0.0410 Inf -4.196  0.0001 
+# InnerSpeech - ThinkOutLoud -0.29328 0.0483 Inf -6.076  <.0001 
+# NoSpeech - ThinkOutLoud    -0.12139 0.0504 Inf -2.409  0.0423 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - NoSpeech     -0.25969 0.0760 Inf -3.419  0.0018 
+# InnerSpeech - ThinkOutLoud  0.00523 0.1163 Inf  0.045  0.9989 
+# NoSpeech - ThinkOutLoud     0.26493 0.1164 Inf  2.276  0.0591
+
+#Degrees-of-freedom method: asymptotic 
+#P value adjustment: tukey method for comparing a family of 3 estimates
+
+x_Valence <- emmip(Valence_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Valence", main="Valence by Speech Type and Attention")
+
+Z_Valence = x_Valence+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color = SpeechNoSpeech)+ 
+scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ylim(c(-3, 3))+theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
+###### Inner Speech vs. Private Speech
+Valence_No_Attention_OnlySpeech = lmer(data= Valence_Speech, Valence~ 1 + (1|SeasonID)+ (1|Activity))
+
+Valence_Null_OnlySpeech = lmer(data= Valence_Speech, Valence~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Valence_Plus_OnlySpeech = lmer(data= Valence_Speech, Valence~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Valence_Full_OnlySpeech = lmer(data= Valence_Speech, Valence~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Valence_No_Attention_OnlySpeech, Valence_Null_OnlySpeech) # Chisq = 100.2      1  < 2.2e-16 ***
+anova(Valence_Null_OnlySpeech, Valence_Plus_OnlySpeech) # Chisq = 15.287      2  0.0004793 ***
+anova(Valence_Plus_OnlySpeech, Valence_Full_OnlySpeech) # Chisq = 3.7878      1    0.05163 .
+
+
+###### Inner Speech vs No Speech
+Valence_NoTOL = Valence_combined %>%
+  filter(!SpeechNoSpeech == "ThinkOutLoud")
+
+Valence_No_Attention_NoTOL = lmer(data= Valence_NoTOL, Valence~ 1  + (1|SeasonID)+ (1|Activity))
+
+Valence_Null_NoTOL = lmer(data= Valence_NoTOL, Valence~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Valence_Plus_NoTOL = lmer(data= Valence_NoTOL, Valence~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Valence_Full_NoTOL = lmer(data= Valence_NoTOL, Valence~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Valence_No_Attention_NoTOL, Valence_Null_NoTOL) #Chisq =  83.46      1  < 2.2e-16 ***
+anova(Valence_Null_NoTOL, Valence_Plus_NoTOL) # Chisq = 15.948      1  6.511e-05 ***
+anova(Valence_Plus_NoTOL, Valence_Full_NoTOL) # Chisq = 2.9567      1    0.08552 .
+
+# R for attention effect
+r.squaredGLMM(Valence_Null_Speech)[1] - r.squaredGLMM(Valence_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Valence_Plus_Speech)[1] - r.squaredGLMM(Valence_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Valence_Full_Speech)[1] - r.squaredGLMM(Valence_Plus_Speech)[1]
+# partial eta square
+eta_sq(Valence_Full_Speech, partial = TRUE)
+
+# R for attention effect
+ r.squaredGLMM(Valence_Null_OnlySpeech)[1] - r.squaredGLMM(Valence_No_Attention_OnlySpeech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Valence_Plus_OnlySpeech)[1] - r.squaredGLMM(Valence_Null_OnlySpeech)[1]
+ #R for interaction effect
+r.squaredGLMM(Valence_Full_OnlySpeech)[1] - r.squaredGLMM(Valence_Plus_OnlySpeech)[1]
+# partial eta square
+eta_sq(Valence_Full_OnlySpeech, partial = TRUE)
+
+#R for interaction effect
+r.squaredGLMM(Valence_Plus_NoTOL)[1] - r.squaredGLMM(Valence_Full_NoTOL)[1]
+# R for attention effect
+ r.squaredGLMM(Valence_Null_NoTOL)[1] - r.squaredGLMM(Valence_No_Attention_NoTOL)[1]
+ # R for Experience type effect
+ r.squaredGLMM(Valence_No_Attention_NoTOL)[1] - r.squaredGLMM(Valence_Plus_NoTOL)[1]
+# partial eta square
+eta_sq(Valence_Full_NoTOL, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Control, include=FALSE}
+Control_Speech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech", "Control_Speech")] ) %>%
+  filter(!is.na(Control_Speech))
+
+Control_NoSpeech = as.data.frame(No_zeroTOL_Corpus[, c("SeasonID", "Activity", "Attention", "SpeechNoSpeech",  "Control_NoSpeech")]) %>%
+  filter(!is.na(Control_NoSpeech))
+
+colnames(Control_Speech)[5] = "Control"
+
+colnames(Control_NoSpeech)[5] = "Control"
+
+Control_combined = bind_rows(Control_Speech, Control_NoSpeech)
+
+Control_combined = Control_combined %>%
+  filter(Attention!="ZoneOut")
+Control_combined$Control = as.factor(Control_combined$Control)
+
+Control_No_Attention_Speech = glmer(data= Control_combined, family = binomial(), Control~ 1 + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Null_Speech = glmer(data= Control_combined, family = binomial(), Control~ 1 + Attention + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Plus_Speech = glmer(data= Control_combined, family = binomial(), Control~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(Control_Plus_Speech)
+
+Control_Full_Speech = glmer(data= Control_combined,family = binomial(), Control~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+anova(Control_No_Attention_Speech,Control_Null_Speech ) #192.65      1  < 2.2e-16 ***
+anova(Control_Null_Speech, Control_Plus_Speech) # Chisq =156.99      2  < 2.2e-16 ***
+anova(Control_Plus_Speech, Control_Full_Speech) # 2.8331      2     0.2426
+
+plot_model(Control_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Control by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans(Control_Full_Speech,  "SpeechNoSpeech")
+pairs(emmeans(Control_Full_Speech,  "SpeechNoSpeech"))
+
+#NOTE: Results may be misleading due to involvement in interactions
+# SpeechNoSpeech emmean    SE  df asymp.LCL asymp.UCL
+# InnerSpeech     0.893 0.110 Inf     0.677     1.108
+# NoSpeech       -0.053 0.111 Inf    -0.271     0.165
+# ThinkOutLoud    1.201 0.149 Inf     0.910     1.493
+
+
+#Results are averaged over the levels of: Attention 
+#Results are given on the logit (not the response) scale. 
+#ConfSeasonIDence level used: 0.95 
+
+#NOTE: Results may be misleading due to involvement in interactions
+# contrast                   estimate    SE  df z.ratio p.value
+#  InnerSpeech - NoSpeech        0.946 0.0924 Inf 10.230  <.0001 
+# InnerSpeech - ThinkOutLoud   -0.309 0.1340 Inf -2.304  0.0553 
+# NoSpeech - ThinkOutLoud      -1.254 0.1359 Inf -9.231  <.0001 
+
+#Results are averaged over the levels of: Attention 
+#Results are given on the log odds ratio (not the response) scale. 
+#P value adjustment: tukey method for comparing a family of 3 estimates 
+
+pairs(emmeans(Control_Full_Speech, ~  SpeechNoSpeech| Attention, type="response"))
+#Attention = AtPresent:
+# contrast                   odds.ratio     SE  df z.ratio p.value
+# InnerSpeech / NoSpeech          2.497 0.2227 Inf  10.261 <.0001 
+# InnerSpeech / ThinkOutLoud      0.501 0.0628 Inf  -5.510 <.0001 
+# NoSpeech / ThinkOutLoud         0.201 0.0253 Inf -12.724 <.0001 
+
+#Attention = NotPresent:
+# contrast                   odds.ratio     SE  df z.ratio p.value
+# InnerSpeech / NoSpeech          2.654 0.4194 Inf   6.176 <.0001 
+# InnerSpeech / ThinkOutLoud      1.076 0.2540 Inf   0.310 0.9485 
+# NoSpeech / ThinkOutLoud         0.405 0.0967 Inf  -3.787 0.0004
+
+# P value adjustment: tukey method for comparing a family of 3 estimates 
+# Tests are performed on the log odds ratio scale 
+
+emmip(Control_Full_Speech, SpeechNoSpeech ~  Attention,style = "factor")
+
+x_control <- emmip(Control_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Control", main="Control by Speech Type and Attention")
+
+Z_control = x_control+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ ylim( c(0, 1)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+### Inner Speech vs. Private Speech
+Control_No_Attention_OnlySpeech = glmer(data= Control_Speech, family = binomial(), Control~ 1  + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Null_OnlySpeech = glmer(data= Control_Speech, family = binomial(), Control~ 1 + Attention + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Plus_OnlySpeech = glmer(data= Control_Speech, family = binomial(), Control~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Full_OnlySpeech = glmer(data= Control_Speech,family = binomial(), Control~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+anova(Control_No_Attention_OnlySpeech, Control_Null_OnlySpeech) # Chisq =  115.13      1  < 2.2e-16 ***
+anova(Control_Null_OnlySpeech, Control_Plus_OnlySpeech) # Chisq = 10.472      2   0.005323 **
+anova(Control_Plus_OnlySpeech, Control_Full_OnlySpeech) # Chisq = 3.0419      1    0.08114 .
+
+### Inner Speech vs. No Speech
+Control_NoTOL = Control_combined %>%
+  filter(!SpeechNoSpeech == "ThinkOutLoud")
+
+Control_No_Attention_NoTOL = glmer(data= Control_NoTOL, family = binomial(), Control~ 1 + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Null_NoTOL = glmer(data= Control_NoTOL, family = binomial(), Control~ 1 + Attention + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+Control_Plus_NoTOL = glmer(data= Control_NoTOL, family = binomial(), Control~ 1 + Attention+SpeechNoSpeech + (1|SeasonID)+ (1|Activity),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(Control_Plus_Speech)
+
+Control_Full_NoTOL= glmer(data= Control_NoTOL,family = binomial(), Control~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+anova(Control_No_Attention_NoTOL, Control_Null_NoTOL) #  155.04      1  < 2.2e-16 ***
+anova(Control_Null_NoTOL, Control_Plus_NoTOL) # Chisq = 110.22      1  < 2.2e-16 ***
+anova(Control_Plus_NoTOL, Control_Full_NoTOL) # 0.0107      1     0.9176
+
+# R for attention effect
+r.squaredGLMM(Control_Null_Speech)[1] - r.squaredGLMM(Control_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Control_Plus_Speech)[1] - r.squaredGLMM(Control_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Control_Full_Speech)[1] - r.squaredGLMM(Control_Plus_Speech)[1]
+# partial eta square
+eta_sq(Control_Full_Speech, partial = TRUE)
+
+# R for attention effect
+ r.squaredGLMM(Control_Null_OnlySpeech)[1] - r.squaredGLMM(Control_No_Attention_OnlySpeech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Control_Plus_OnlySpeech)[1] - r.squaredGLMM(Control_Null_OnlySpeech)[1]
+ #R for interaction effect
+r.squaredGLMM(Control_Full_OnlySpeech)[1] - r.squaredGLMM(Control_Plus_OnlySpeech)[1]
+# partial eta square
+eta_sq(Control_Full_OnlySpeech, partial = TRUE)
+
+#R for interaction effect
+r.squaredGLMM(Control_Plus_NoTOL)[1] - r.squaredGLMM(Control_Full_NoTOL)[1]
+# R for attention effect
+ r.squaredGLMM(Control_Null_NoTOL)[1] - r.squaredGLMM(Control_No_Attention_NoTOL)[1]
+ # R for Experience type effect
+ r.squaredGLMM(Control_No_Attention_NoTOL)[1] - r.squaredGLMM(Control_Plus_NoTOL)[1]
+# partial eta square
+eta_sq(Control_Full_NoTOL, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Feeling, include=FALSE}
+Feeling_PandNP = as.data.frame(No_zeroTOL_Corpus[, c("Attention","Feeling_PandNP","Activity", "SpeechNoSpeech","SeasonID" )]) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Feeling_PandNP)) %>%
+  filter(!is.na(SpeechNoSpeech))
+
+Feeling_No_Attention_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1  + (1|SeasonID)+ (1|Activity))
+
+Feeling_Null_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Feeling_Plus_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1 + Attention + SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+Feeling_Full_Speech = lmer(data= Feeling_PandNP, Feeling_PandNP~ 1 + Attention * SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+anova(Feeling_No_Attention_Speech, Feeling_Null_Speech) #  138.38      1  < 2.2e-16 ***
+anova(Feeling_Null_Speech, Feeling_Plus_Speech) # Chi2 =  26.325      2  1.921e-06 ***
+anova(Feeling_Plus_Speech, Feeling_Full_Speech) # Chi2 = 4.8852      2    0.08693 .
+
+emmeans(Feeling_Full_Speech,  "SpeechNoSpeech")
+# SpeechNoSpeech emmean    SE   df lower.CL upper.CL
+#  InnerSpeech     0.542 0.0882 Inf     0.369     0.715
+# NoSpeech        0.760 0.0890 Inf     0.586     0.935
+# ThinkOutLoud    0.864 0.1014 Inf     0.666     1.063
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: asymptotic 
+# ConfSeasonIDence level used: 0.95 
+
+pairs(emmeans(Feeling_Full_Speech,  "SpeechNoSpeech"))
+# contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - NoSpeech       -0.219 0.0470 Inf -4.651  <.0001 
+# InnerSpeech - ThinkOutLoud   -0.323 0.0678 Inf -4.764  <.0001 
+# NoSpeech - ThinkOutLoud      -0.104 0.0684 Inf -1.521  0.2810 
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: asymptotic 
+# P value adjustment: tukey method for comparing a family of 3 estimates 
+
+pairs(emmeans(Feeling_Full_Speech,  ~SpeechNoSpeech|  Attention ,type="response"))
+#Attention = AtPresent:
+#  contrast                   estimate     SE   df t.ratio p.value
+#  InnerSpeech - NoSpeech      -0.1646 0.0440 Inf -3.740  0.0005 
+# InnerSpeech - ThinkOutLoud  -0.2984 0.0518 Inf -5.758  <.0001 
+# NoSpeech - ThinkOutLoud     -0.1339 0.0541 Inf -2.474  0.0357 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - NoSpeech      -0.2729 0.0815 Inf -3.347  0.0024 
+# InnerSpeech - ThinkOutLoud  -0.3471 0.1248 Inf -2.781  0.0150 
+#NoSpeech - ThinkOutLoud     -0.0743 0.1249 Inf -0.595  0.8231 
+
+# Degrees-of-freedom method: asymptotic 
+# P value adjustment: tukey method for comparing a family of 3 estimates 
+
+emmip(Feeling_Full_Speech, SpeechNoSpeech ~  Attention,style = "factor")
+
+x_Feeling <- emmip(Feeling_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Feeling", main="Feeling by Speech Type and Attention")
+
+Z_Feeling = x_Feeling+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#E69F00", "#56B4E9") )+ ylim( c(-3, 3))  +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+grid.arrange(Z_Valence, Z_Feeling, nrow = 1)
+
+##### Inner Speech vs. Private Speech
+Feeling_PandNP_OnlySpeech = as.data.frame(No_zeroTOL_Corpus[, c("Attention","Feeling_PandNP","Activity", "SpeechNoSpeech","SeasonID" )]) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Feeling_PandNP)) %>%
+  filter(!is.na(SpeechNoSpeech)) %>%
+  filter(SpeechNoSpeech !="NoSpeech")
+Feeling_No_Attention_OnlySpeech = lmer(data= Feeling_PandNP_OnlySpeech, Feeling_PandNP~ 1 + (1|SeasonID)+ (1|Activity))
+
+Feeling_Null_OnlySpeech = lmer(data= Feeling_PandNP_OnlySpeech, Feeling_PandNP~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Feeling_Plus_OnlySpeech = lmer(data= Feeling_PandNP_OnlySpeech, Feeling_PandNP~ 1 + Attention + SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+Feeling_Full_OnlySpeech = lmer(data= Feeling_PandNP_OnlySpeech, Feeling_PandNP~ 1 + Attention * SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+anova(Feeling_No_Attention_OnlySpeech, Feeling_Null_OnlySpeech) #  100.42      1  < 2.2e-16 ***
+anova(Feeling_Null_OnlySpeech, Feeling_Plus_OnlySpeech) # 18.05      1  2.152e-05 ***
+anova(Feeling_Plus_OnlySpeech, Feeling_Full_OnlySpeech) # 0.2204      1     0.6388
+
+### Inner Speech vs. No Speech
+Feeling_PandNP_NoTOL = as.data.frame(No_zeroTOL_Corpus[, c("Attention","Feeling_PandNP","Activity", "SpeechNoSpeech","SeasonID" )]) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Feeling_PandNP)) %>%
+  filter(!is.na(SpeechNoSpeech)) %>%
+  filter(SpeechNoSpeech !="ThinkOutLoud")
+Feeling_No_Attention_NoTOL = lmer(data= Feeling_PandNP_NoTOL, Feeling_PandNP~ 1 + (1|SeasonID)+ (1|Activity))
+
+Feeling_Null_NoTOL = lmer(data= Feeling_PandNP_NoTOL, Feeling_PandNP~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Feeling_Plus_NoTOL = lmer(data= Feeling_PandNP_NoTOL, Feeling_PandNP~ 1 + Attention + SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+Feeling_Full_NoTOL = lmer(data= Feeling_PandNP_NoTOL, Feeling_PandNP~ 1 + Attention * SpeechNoSpeech+ (1|SeasonID)+ (1|Activity))
+
+anova(Feeling_No_Attention_NoTOL, Feeling_Null_NoTOL) # 120.16      1  < 2.2e-16 ***
+anova(Feeling_Null_NoTOL, Feeling_Plus_NoTOL) # 14.28      1  0.0001575 ***
+anova(Feeling_Plus_NoTOL, Feeling_Full_NoTOL) #3.4457      1    0.06342 .
+
+# R for attention effect
+r.squaredGLMM(Feeling_Null_Speech)[1] - r.squaredGLMM(Feeling_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Feeling_Plus_Speech)[1] - r.squaredGLMM(Feeling_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Feeling_Full_Speech)[1] - r.squaredGLMM(Feeling_Plus_Speech)[1]
+# partial eta square
+eta_sq(Feeling_Full_Speech, partial = TRUE)
+
+# R for attention effect
+ r.squaredGLMM(Feeling_Null_OnlySpeech)[1] - r.squaredGLMM(Feeling_No_Attention_OnlySpeech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Feeling_Plus_OnlySpeech)[1] - r.squaredGLMM(Feeling_Null_OnlySpeech)[1]
+ #R for interaction effect
+r.squaredGLMM(Feeling_Full_OnlySpeech)[1] - r.squaredGLMM(Feeling_Plus_OnlySpeech)[1]
+# partial eta square
+eta_sq(Feeling_Full_OnlySpeech, partial = TRUE)
+
+#R for interaction effect
+r.squaredGLMM(Feeling_Plus_NoTOL)[1] - r.squaredGLMM(Feeling_Full_NoTOL)[1]
+# R for attention effect
+ r.squaredGLMM(Feeling_Null_NoTOL)[1] - r.squaredGLMM(Feeling_No_Attention_NoTOL)[1]
+ # R for Experience type effect
+ r.squaredGLMM(Feeling_No_Attention_NoTOL)[1] - r.squaredGLMM(Feeling_Plus_NoTOL)[1]
+# partial eta square
+eta_sq(Feeling_Full_NoTOL, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_self, include=FALSE}
+Self_Speech =  as.data.frame(No_zeroTOL_Corpus[,c ("Self_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech")]) %>% 
+  filter(!is.na(Self_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Self_Speech$Self_Speech)
+
+Self_Speech$Self_Speech = as.factor(Self_Speech$Self_Speech)
+
+Self_Speech_No_Attention_Speech = glmer(data= Self_Speech, family = binomial(), 
+                                Self_Speech~ 1 + (1|SeasonID)+ (1|Activity))
+
+Self_Speech_Null_Speech = glmer(data= Self_Speech, family = binomial(), 
+                                Self_Speech~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Self_Speech_Plus_Speech = glmer(data= Self_Speech, family = binomial(), 
+                                Self_Speech~ 1 + Attention + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Self_Speech_Full_Speech = glmer(data= Self_Speech,family = binomial(), Self_Speech~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Self_Speech_No_Attention_Speech,Self_Speech_Null_Speech) #3.9417      1     0.0471 *
+anova(Self_Speech_Null_Speech, Self_Speech_Plus_Speech) #   20.077      1  7.439e-06 ***
+anova(Self_Speech_Plus_Speech, Self_Speech_Full_Speech) #  0.246      1     0.6199
+
+plot_model(Self_Speech_Plus_Speech, type = "eff", terms = "SpeechNoSpeech", show.data = F, title = "Predicted Self_Speech by Speech or No Speech, model = LMER", colors = "dust")+xlab("Speech Status")
+
+emmeans(Self_Speech_Full_Speech,  "SpeechNoSpeech")
+
+# SpeechNoSpeech emmean    SE  df asymp.LCL asymp.UCL
+#  InnerSpeech     0.784 0.105 Inf    0.5783     0.990
+# ThinkOutLoud    0.323 0.139 Inf    0.0497     0.596
+
+# Results are averaged over the levels of: Attention 
+# Results are given on the logit (not the response) scale. 
+# ConfSeasonIDence level used: 0.95 
+pairs(emmeans(Self_Speech_Full_Speech,  "SpeechNoSpeech"))
+
+# contrast                   estimate    SE  df z.ratio p.value
+# InnerSpeech - ThinkOutLoud    0.461 0.127 Inf 3.632   0.0003 
+
+#Results are averaged over the levels of: Attention 
+#Results are given on the log odds ratio (not the response) scale. 
+
+pairs(emmeans(Self_Speech_Full_Speech, ~  SpeechNoSpeech| Attention, type="response"))
+#Attention = AtPresent:
+# contrast                   odds.ratio    SE  df z.ratio p.value
+#  InnerSpeech / ThinkOutLoud       1.52 0.150 Inf 4.198   <.0001 
+
+#Attention = NotPresent:
+# contrast                   odds.ratio    SE  df z.ratio p.value
+# InnerSpeech / ThinkOutLoud       1.66 0.386 Inf 2.177   0.0295
+
+#Tests are performed on the log odds ratio scale 
+
+emmip(Self_Speech_Full_Speech, SpeechNoSpeech ~  Attention,style = "factor")
+
+
+x_Self_Speech <- emmip(Self_Speech_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Self_Speech", main="Self_Speech by Speech Type and Attention")
+
+Z_Self_Speech = x_Self_Speech+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#56B4E9") )+ ylim( c(0, 1)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+# R for attention effect
+r.squaredGLMM(Self_Speech_Null_Speech)[1] - r.squaredGLMM(Self_Speech_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Self_Speech_Plus_Speech)[1] - r.squaredGLMM(Self_Speech_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Self_Speech_Full_Speech)[1] - r.squaredGLMM(Self_Speech_Plus_Speech)[1]
+# partial eta square
+eta_sq(Self_Speech_Full_Speech, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Importance, include=FALSE}
+Importance_Speech =  as.data.frame(No_zeroTOL_Corpus[,c ("Importance_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech")]) %>% 
+  filter(!is.na(Importance_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Importance_Speech$Importance_Speech)
+
+Importance_Speech$Importance_Speech = as.numeric(Importance_Speech$Importance_Speech)
+Importance_Speech_No_Attention_Speech = lmer(data= Importance_Speech, 
+                                Importance_Speech~ 1  + (1|SeasonID)+ (1|Activity))
+
+Importance_Speech_Null_Speech = lmer(data= Importance_Speech, 
+                                Importance_Speech~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Importance_Speech_Plus_Speech = lmer(data= Importance_Speech, 
+                                Importance_Speech~ 1 + Attention + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Importance_Speech_Full_Speech = lmer(data= Importance_Speech,Importance_Speech~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Importance_Speech_No_Attention_Speech, Importance_Speech_Null_Speech) # 9.9048      1   0.001649
+anova(Importance_Speech_Null_Speech, Importance_Speech_Plus_Speech) # 1.6073      1     0.2049
+anova(Importance_Speech_Plus_Speech, Importance_Speech_Full_Speech) # 0.8319      1     0.3617
+
+emmeans(Importance_Speech_Full_Speech,  "SpeechNoSpeech")
+# SpeechNoSpeech emmean    SE    df lower.CL upper.CL
+# InnerSpeech      3.74 0.107 Inf      3.53      3.94
+# ThinkOutLoud     3.73 0.123 Inf      3.48      3.97
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: kenward-roger 
+#ConfSeasonIDence level used: 0.95 
+pairs(emmeans(Importance_Speech_Full_Speech,  "SpeechNoSpeech"))
+# contrast                   estimate    SE   df t.ratio p.value
+# InnerSpeech - ThinkOutLoud  0.00926 0.0828 Inf 0.112   0.9109 
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: kenward-roger
+
+
+pairs(emmeans(Importance_Speech_Full_Speech, ~  SpeechNoSpeech| Attention, type="response"))
+
+#Attention = AtPresent:
+# contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - ThinkOutLoud   0.0793 0.0633 Inf  1.253  0.2102 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - ThinkOutLoud  -0.0608 0.1522 Inf -0.399  0.6896 
+#Degrees-of-freedom method: kenward-roger 
+
+
+x_Importance_Speech <- emmip(Importance_Speech_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Importance_Speech", main="Importance_Speech by Speech Type and Attention")
+
+Z_Importance_Speech = x_Importance_Speech+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#56B4E9") )+ ylim( c(1, 7)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+# R for attention effect
+r.squaredGLMM(Importance_Speech_Null_Speech)[1] - r.squaredGLMM(Importance_Speech_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Importance_Speech_Plus_Speech)[1] - r.squaredGLMM(Importance_Speech_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM( Importance_Speech_Full_Speech)[1] - r.squaredGLMM(Importance_Speech_Plus_Speech)[1]
+# partial eta square
+eta_sq( Importance_Speech_Full_Speech, partial = TRUE)
+```
+# Paper 2 -- Updated For proposal
+```{r SpeechTypeComparison_Temporal, include=FALSE}
+Temporal_Speech =  as.data.frame(No_zeroTOL_Corpus[,c ("Temporal_Speech", "SeasonID", "Activity", "Attention", "SpeechNoSpeech")]) %>% 
+  filter(!is.na(Temporal_Speech)) %>%
+  filter(SpeechNoSpeech== "InnerSpeech" | SpeechNoSpeech== "ThinkOutLoud" ) %>%
+  filter(Attention !="ZoneOut") %>%
+  filter(!is.na(Attention)) %>%
+  filter(!is.na(SeasonID))
+
+table(Temporal_Speech$Temporal_Speech)
+
+Temporal_Speech$Temporal_Speech = as.numeric(Temporal_Speech$Temporal_Speech)
+
+Temporal_Speech_No_Attention_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Null_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + Attention + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Plus_Speech = lmer(data= Temporal_Speech, 
+                                Temporal_Speech~ 1 + Attention + SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+Temporal_Speech_Full_Speech = lmer(data= Temporal_Speech,Temporal_Speech~ 1 + Attention*SpeechNoSpeech + (1|SeasonID)+ (1|Activity))
+
+anova(Temporal_Speech_No_Attention_Speech,Temporal_Speech_Null_Speech) # 0.6271      1     0.4284
+anova(Temporal_Speech_Null_Speech, Temporal_Speech_Plus_Speech) # 4.7582      1    0.02916 *
+anova(Temporal_Speech_Plus_Speech, Temporal_Speech_Full_Speech) # 0.1246      1     0.7241
+
+
+emmeans(Temporal_Speech_Full_Speech,  "SpeechNoSpeech")
+
+# SpeechNoSpeech emmean     SE  df lower.CL upper.CL
+#InnerSpeech      5.19 0.0348 Inf      5.12      5.25
+# ThinkOutLoud     5.03 0.0559 Inf      4.92      5.14
+
+#Results are averaged over the levels of: Attention 
+#Degrees-of-freedom method: kenward-roger 
+#ConfSeasonIDence level used: 0.95 
+pairs(emmeans(Temporal_Speech_Full_Speech,  "SpeechNoSpeech"))
+# contrast                   estimate    SE   df t.ratio p.value
+# InnerSpeech - ThinkOutLoud    0.158 0.0607 Inf 2.606   0.0092 
+
+# Results are averaged over the levels of: Attention 
+# Degrees-of-freedom method: kenward-roger
+
+
+pairs(emmeans(Temporal_Speech_Full_Speech, ~  SpeechNoSpeech| Attention, type="response"))
+
+#Attention = AtPresent:
+# contrast                   estimate     SE   df t.ratio p.value
+# InnerSpeech - ThinkOutLoud   0.0925 0.0457 Inf 2.026   0.0428 
+
+#Attention = NotPresent:
+# contrast                   estimate     SE  df z.ratio p.value
+# InnerSpeech - ThinkOutLoud   0.2240 0.1125 Inf 1.991   0.0464 
+
+
+#Degrees-of-freedom method: kenward-roger 
+
+emmip(Temporal_Speech_Full_Speech, SpeechNoSpeech ~  Attention,style = "factor")
+
+
+x_Temporal_Speech <- emmip(Temporal_Speech_Full_Speech, SpeechNoSpeech ~  Attention,  CIs = TRUE, type="response", 
+    xlab = "Attention", ylab = "Temporal_Speech", main="Temporal_Speech by Speech Type and Attention")
+
+Z_Temporal_Speech = x_Temporal_Speech+ theme_bw() +aes(linetype = SpeechNoSpeech, shape = SpeechNoSpeech, color= SpeechNoSpeech)+ scale_color_manual( values=c("#999999", "#56B4E9") )+ ylim( c(1, 10)) +theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+
+
+
+###### 
+ ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+
+ ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+  
+ ggplot(Temporal_Speech %>%
+          filter(Attention =="AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+   
+ ggplot(Temporal_Speech %>%
+          filter(Attention =="NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)
+ 
+ #### replying to Karen 0423: 4 graphs (2 attention*2 speech)
+  Temporal_ThinkOutLoud_AtPresent = ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud" & Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1) + ggtitle("ThinkOutLoud & AtPresent")
+  
+Temporal_ThinkOutLoud_NotPresent=  ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="ThinkOutLoud" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("ThinkOutLoud & NotPresent")
+  
+Temporal_InnerSpeech_AtPresent=   ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech" & Attention == "AtPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & AtPresent")
+  
+ Temporal_InnerSpeech_NotPresent= ggplot(Temporal_Speech %>%
+          filter(SpeechNoSpeech =="InnerSpeech" & Attention == "NotPresent"),  aes(x=Temporal_Speech))+
+  geom_histogram(binwidth = 1)+ ggtitle("InnerSpeech & NotPresent")
+  
+  #####
+Temporal_AtPresent = gridExtra::grid.arrange(Temporal_ThinkOutLoud_AtPresent, Temporal_ThinkOutLoud_NotPresent, nrow=1)
+Temporal_NotPresent = gridExtra::grid.arrange(Temporal_InnerSpeech_AtPresent, Temporal_InnerSpeech_NotPresent, nrow=1)
+Temporal2by2 = rbind(Temporal_AtPresent, Temporal_NotPresent, size = "first")
+Temporal2by2$widths <- unit.pmax(Temporal_AtPresent$widths, Temporal_NotPresent$widths)
+grid.newpage()
+grid.draw(Temporal2by2)
+
+# R for attention effect
+r.squaredGLMM(Temporal_Speech_Null_Speech)[1] - r.squaredGLMM(Temporal_Speech_No_Attention_Speech)[1]
+# R for Experience type effect
+ r.squaredGLMM(Temporal_Speech_Plus_Speech)[1] - r.squaredGLMM(Temporal_Speech_Null_Speech)[1]
+ #R for interaction effect
+r.squaredGLMM(Temporal_Speech_Full_Speech)[1] - r.squaredGLMM(Temporal_Speech_Plus_Speech)[1]
+# partial eta square
+eta_sq(Temporal_Speech_Full_Speech, partial = TRUE)
+```
+
+# Study 2 in the proposal
+```{r setup, include=FALSE}
+# 08022020 checked
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lme4)
+library(sjPlot)
+library(corrplot)
+
+# note that this dataset already no outlier # the outliers deleted in the Google Sheet were A15255117, A13397671, A13683711, A1560385
+PrivateSpeech_Adult_1106<- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/Data_Fall19_SONA_PS/19KD06_Adult.csv")
+
+PrivateSpeech_Adult_1106 = PrivateSpeech_Adult_1106[c(2:nrow(PrivateSpeech_Adult_1106)), 1:47] # getting rid of the top road and the columns after useful info.
+View(PrivateSpeech_Adult_1106)
+## importing the PS content coding file 
+PS_coding_analysis <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_coding_analysis.csv")
+View(PS_coding_analysis)
+```
+
+# Study 2 in the proposal
+```{r data_transformation, include=FALSE}
+# 08022020 checked
+# Are participants performances influenced by private speech manipulation? Using the T_diff and F_diff, since this skips revering back to one measurement for the two conditions
+# the primary result on excel has shown null results between the two conditions, but there linear regressions that take gender, age, and countries are recuited to focus on the effect of the manipulation
+PrivateSpeech_Adult_1106$T_diff = as.numeric(PrivateSpeech_Adult_1106$T_diff)
+PrivateSpeech_Adult_1106$F_diff = as.numeric(PrivateSpeech_Adult_1106$F_diff)
+PrivateSpeech_Adult_1106$Q2_6_TEXT = as.numeric(PrivateSpeech_Adult_1106$Q2_6_TEXT)
+PrivateSpeech_Adult_1106[,c(2:13, 15:25, 27, 41:46)] = sapply(PrivateSpeech_Adult_1106[,c(2:13, 15:25, 27, 41:46)], as.numeric)
+
+# `Rate (utterance/minute)` to numeric
+PS_coding_analysis$`Rate (utterance/minute)` = as.numeric(PS_coding_analysis$`Rate (utterance/minute)`)
+
+# changing the names of the column for matching purposes
+colnames(PrivateSpeech_Adult_1106)[which(names(PrivateSpeech_Adult_1106) =="Q29")] ="PID"
+colnames(PrivateSpeech_Adult_1106)[which(names(PrivateSpeech_Adult_1106) =="X47")] ="ED_or_DE"
+
+# filter those rows that PIDs are NAs
+PrivateSpeech_Adult_1106 =PrivateSpeech_Adult_1106 %>%
+  filter(PID > 0)
+#preparation of the two datasets (performance and coding) before combining them using PID
+PrivateSpeech_Adult_1106$PID = substr(PrivateSpeech_Adult_1106$PID, 2, 9)
+PS_coding_analysis$PID = substr(PS_coding_analysis$PID, 2, 9)
+```
+
+# Study 2 in the proposal
+```{r importing 021120 SONA, include=FALSE}
+#08022020 checked
+# the results showed that the trend is still fewer flips and longer time for the encouraged condition
+PS_SONA_021120_performance <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_SONA_021120_performance.csv")
+
+highOL_time = print(PS_SONA_021120_performance$Time[PS_SONA_021120_performance$Time > (mean(PS_SONA_021120_performance$Time) + 3*sd(PS_SONA_021120_performance$Time))])
+
+lowOL_time = print(PS_SONA_021120_performance$Time[PS_SONA_021120_performance$Time < (mean(PS_SONA_021120_performance$Time) - 3*sd(PS_SONA_021120_performance$Time))])
+
+highOL_flips = print(PS_SONA_021120_performance$Flips[PS_SONA_021120_performance$Flips > (mean(PS_SONA_021120_performance$Flips) + 3*sd(PS_SONA_021120_performance$Flips))])
+
+lowOL_flips=print(PS_SONA_021120_performance$Flips[PS_SONA_021120_performance$Flips < (mean(PS_SONA_021120_performance$Flips) - 3*sd(PS_SONA_021120_performance$Flips))])
+
+ID_OL_Time = PS_SONA_021120_performance$ID[PS_SONA_021120_performance$Time == c(highOL_time, lowOL_time)]
+ID_OL_Flip =PS_SONA_021120_performance$ID[ PS_SONA_021120_performance$Flips == c(highOL_flips, lowOL_flips)]
+
+PS_SONA_021120_performance<-PS_SONA_021120_performance %>%
+  filter(!ID %in% c(ID_OL_Flip, ID_OL_Time))
+
+nrow(as.data.frame(unique(PS_SONA_021120_performance$ID)))
+```
+
+# Study 2 in the proposal
+```{r importing the 57 complete cases from piloting into the newer data, include=FALSE}
+# 08022020 checked
+SONAPilotingComplete <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/SONAPilotingComplete.csv")
+nrow(SONAPilotingComplete)
+
+glimpse(SONAPilotingComplete)
+
+glimpse(PS_SONA_021120_performance)
+
+
+# Save new combined file and testing the results using the combined data
+library(tidyverse) 
+
+ET =  c(PS_SONA_021120_performance$Time[PS_SONA_021120_performance$Condition =="e"], SONAPilotingComplete$ET)
+
+DT =  c(PS_SONA_021120_performance$Time[PS_SONA_021120_performance$Condition =="d"], SONAPilotingComplete$DT)
+
+EF =  c(PS_SONA_021120_performance$Flips[PS_SONA_021120_performance$Condition =="e"], SONAPilotingComplete$EF)
+
+DF =  c(PS_SONA_021120_performance$Flips[PS_SONA_021120_performance$Condition =="d"], SONAPilotingComplete$DF)
+
+t.test(ET, DT, paired = TRUE)
+
+t.test(EF, DF, paired = TRUE)
+
+mean(EF/DF)
+mean(ET/DT)
+
+### effect size calculation
+FlipEffectSize = (mean(EF) - mean(DF))/sqrt( (var(EF)+ var(DF))/2 ) # -0.2742862
+
+TimeEffectSize = (mean(ET) - mean(DT))/sqrt( (var(ET)+ var(DT))/2 ) # 0.02352045
+
+### the time processing each stimuli takes, the comparison between the two
+t.test(ET/EF, DT/DF, paired = TRUE)
+
+Effort_EffectSize = (mean(ET/EF) - mean(DT/DF))/sqrt( (var(ET/EF)+ var(DT/DF))/2 ) # 0.2203571
+```
+# Study 2 in the proposal
+```{r combining performance with PS content, include= FALSE}
+# 08022020 checked
+## note that "experimenter absent" tab of the online excel file tells that A13848746,A16176085; A13779845, A14617892, A15780562 (bcz of not being tested in a 6*6); A16170305 and A15748410 (were not recorded due to experimenter error); from the "Coding_all_draft" A15441332 was omitted since she was singing.
+
+##### is was full_join(PS_coding_analysis, SONAPilotingComplete) 
+Combined_Performance_coding = full_join(PS_coding_analysis, SONAPilotingComplete, by = "PID")
+
+View(Combined_Performance_coding)
+
+### getting a mean and SD score for everyone's PS 
+
+AvgRate = mean(na.omit(as.numeric(Combined_Performance_coding$`Rate (utterance/minute)`))) #19.61031 words per minute
+SD_Rate = sd(na.omit(as.numeric(Combined_Performance_coding$`Rate (utterance/minute)`))) # 9.603973
+
+AvgSum = mean(na.omit(Combined_Performance_coding$Sum))# 35.47887 words
+SD_Sum = sd(na.omit(Combined_Performance_coding$Sum)) #22.28764 words per minute
+
+### making a table for the kinds of language recorded
+table(Combined_Performance_coding$Language) #57 English; 7 Mandarin; 2 English and Mandarin; 2 Korean; 2 Mixed unknownlanguage; inaudible 1
+
+
+### plotting the histogram and density plot of Rate
+plot1 <- ggplot(Combined_Performance_coding,  aes(x=as.numeric(`Rate (utterance/minute)`)))+
+  geom_histogram(binwidth = 1) + 
+    ggtitle('Private Speech Frequency histogram \nAdults')+
+  scale_x_continuous('Utterances Per Minuate', breaks=seq(0,50, by=5))+
+  theme_minimal()
+plot2 <- ggplot(Combined_Performance_coding, aes(x=as.numeric(`Rate (utterance/minute)`)))+
+ geom_density(fill='gray', alpha=0.5)+
+ ggtitle('Private Speech Frequency density \nAdults')+
+ scale_x_continuous('Utterances Per Minuate', breaks=seq(0,50, by=5))+
+ theme_minimal()
+gridExtra::grid.arrange(plot1, plot2, nrow=1)
+
+# note that there is a large individual difference in the distribution of private speech content, but here is the average distribution
+Combined_Performance_coding = Combined_Performance_coding %>%
+  mutate(A_percentage = A_Here_strategy/Sum, L_Percentage = labeling/Sum, F_percentage = figuringout/Sum, R_percentage = relief/Sum, D_percentage = Directions_location/Sum, P_percentage = positive_M/Sum, N_percentage = negative/Sum)
+
+Mean_A = mean(na.omit(Combined_Performance_coding$A_percentage))#0.1548595
+Mean_R = mean(na.omit(Combined_Performance_coding$R_percentage))#0.06511652
+Mean_D = mean(na.omit(Combined_Performance_coding$D_percentage))# 0.1013284
+Mean_F = mean(na.omit(Combined_Performance_coding$F_percentage)) #0.1710502
+Mean_L = mean(na.omit(Combined_Performance_coding$L_Percentage)) #0.5953334
+Mean_P = mean(na.omit(Combined_Performance_coding$P_percentage))# 0.04809459
+Mean_N = mean(na.omit(Combined_Performance_coding$N_percentage)) #0.09987337
+
+Mean_A_lower = Mean_A - parameters::standard_error(na.omit(Combined_Performance_coding$A_percentage))
+Mean_A_higher = Mean_A + parameters::standard_error(na.omit(Combined_Performance_coding$A_percentage))
+
+Mean_R_lower = Mean_R - parameters::standard_error(na.omit(Combined_Performance_coding$R_percentage))
+Mean_R_higher = Mean_R + parameters::standard_error(na.omit(Combined_Performance_coding$R_percentage))
+
+Mean_D_lower = Mean_D - parameters::standard_error(na.omit(Combined_Performance_coding$D_percentage))
+Mean_D_higher = Mean_D + parameters::standard_error(na.omit(Combined_Performance_coding$D_percentage))
+
+Mean_F_lower = Mean_F - parameters::standard_error(na.omit(Combined_Performance_coding$F_percentage))
+Mean_F_higher = Mean_F + parameters::standard_error(na.omit(Combined_Performance_coding$F_percentage))
+
+Mean_L_lower = Mean_L - parameters::standard_error(na.omit(Combined_Performance_coding$L_Percentage))
+Mean_L_higher = Mean_L + parameters::standard_error(na.omit(Combined_Performance_coding$L_Percentage))
+
+Mean_P_lower = Mean_P - parameters::standard_error(na.omit(Combined_Performance_coding$P_percentage))
+Mean_P_higher = Mean_P + parameters::standard_error(na.omit(Combined_Performance_coding$P_percentage))
+
+Mean_N_lower = Mean_N - parameters::standard_error(na.omit(Combined_Performance_coding$N_percentage))
+Mean_N_higher = Mean_N + parameters::standard_error(na.omit(Combined_Performance_coding$N_percentage))
+
+#building the matrix
+Percentage_plot_matrix = matrix(c("Acknowleding","Relief","Direction/Location" ,"Figuringout","Labeling","Positive","Negative",Mean_A, Mean_R ,Mean_D, Mean_F, Mean_L,Mean_P, Mean_N, Mean_A_lower, Mean_R_lower, Mean_D_lower, Mean_F_lower, Mean_L_lower,Mean_P_lower, Mean_N_lower, Mean_A_higher, Mean_R_higher, Mean_D_higher, Mean_F_higher, Mean_L_higher, Mean_P_higher, Mean_N_higher), nrow = 7, ncol = 4)
+
+ colnames(Percentage_plot_matrix) = c("Categories","Mean", "Bound_lower", "Bound_higher")
+ 
+ Percentage_plot_matrix = as.data.frame(Percentage_plot_matrix)
+
+ Percentage_plot_matrix$Mean =as.numeric(levels( Percentage_plot_matrix$Mean))[ Percentage_plot_matrix$Mean]
+ Percentage_plot_matrix$Bound_lower = as.numeric(levels( Percentage_plot_matrix$Bound_lower))[ Percentage_plot_matrix$Bound_lower]
+ Percentage_plot_matrix$Bound_higher =as.numeric(levels( Percentage_plot_matrix$Bound_higher))[ Percentage_plot_matrix$Bound_higher]
+
+
+ ####
+# Combined_Performance_coding = Combined_Performance_coding %>%
+#  mutate(TA_QA_Diff = Q5_1 - Q6_1, TP_QP_Diff = Q7_1 - Q8_1,TA_QA_Ratio= Q5_1/Q6_1, TP_QP_Ratio = Q7_1/Q8_1)
+ 
+ # percentage bar plot
+Percentage_plot_matrix$Categories = with(Percentage_plot_matrix, reorder(Categories, Mean, median))
+
+Percentage_plot<- ggplot(Percentage_plot_matrix, aes(x=Categories,y=Mean, fill = Categories)) + 
+    geom_bar(stat="identity", color="black", 
+             position=position_dodge()) +
+    geom_errorbar(aes(ymin=Bound_lower, ymax=Bound_higher), width=.2,
+                  position=position_dodge(.9)) +
+scale_y_continuous('Percentage', breaks = seq(0, 1, by=0.25))+labs(x = "Private Speech Categories \nError bars indicate SEs")+
+theme_minimal()+
+  theme(legend.position = 'none')
+
+# plotting percentages in an alternative way:
+A_adults = data.frame(Combined_Performance_coding$A_percentage)
+A_adults$type = "Acknowledge"
+P_adults= data.frame(Combined_Performance_coding$P_percentage)
+P_adults$type = "Positive"
+N_adults = data.frame(Combined_Performance_coding$N_percentage)
+N_adults$type = "Negative"
+L_adults = data.frame(Combined_Performance_coding$L_Percentage)
+L_adults$type = "Labeling"
+F_adults = data.frame(Combined_Performance_coding$F_percentage)
+F_adults$type = "FiguringOut"
+D_adults = data.frame(Combined_Performance_coding$D_percentage)
+D_adults$type = "Direction/Location"
+R_adults = data.frame(Combined_Performance_coding$D_percentage)
+R_adults$type = "Relief"
+
+
+names(P_adults) = c("percentage", "type")
+names(A_adults) = c("percentage", "type")
+names(L_adults) = c("percentage", "type")
+names(N_adults) = c("percentage", "type")
+names(F_adults) = c("percentage", "type")
+names(R_adults) = c("percentage", "type")
+names(D_adults) = c("percentage", "type")
+
+total_adults = rbind(A_adults,L_adults, F_adults, P_adults, N_adults, R_adults, D_adults)
+total_adults = total_adults[complete.cases(total_adults),]
+
+p_adults_boxplot = total_adults %>%
+  mutate(type = forcats::fct_reorder(type, percentage, .fun='median')) %>%
+  ggplot( aes(x=reorder(type, percentage), y=percentage, fill=type)) + 
+  ggtitle('Private Speech Categories Frequency \nAdults')+
+    geom_boxplot() +
+    theme(legend.position="none") +
+    xlab("")
+
+#corr.matrix
+corelation_matrix = as.data.frame(Combined_Performance_coding[, c("T_diff", "T_diff", "A_percentage", "L_Percentage","F_percentage","R_percentage", "D_percentage", "P_percentage", "N_percentage", "Rate (utterance/minute)","Sum") ]) 
+corelation_matrix[is.na(corelation_matrix)] <- 0
+colnames(corelation_matrix) = c("ET-DT", "EF-DF", "Acknowledge", "Label", "FiguringOut","Relief", "Direction", "Positive", "Negative","Rate","Sum")
+
+corelation_matrix_cor <- cor(corelation_matrix)
+
+res1 <- cor.mtest(corelation_matrix_cor, conf.level = .95)
+
+corrplot(corelation_matrix_cor, p.mat = res1$p, method = "color", type = "upper",
+         sig.level = c(.001, .01, .05), pch.cex = .9,
+         insig = "label_sig", pch.col = "white")
+
+corelation_matrix_plot = corrplot::corrplot.mixed(corelation_matrix_cor,lower.col = "black", number.cex = .7,p.mat = res1$p, upper = "color",
+         sig.level = c(.001, .01, .05), pch.cex = .9,
+         insig = "label_sig", pch.col = "white")
+```
+# Study 2 in the proposal
+```{r evaluative subjects performance, include=false}
+PS_coding_analysis[is.na(PS_coding_analysis)]=0
+
+evaluativeSubj = PS_coding_analysis %>%
+  mutate(PandN = positive_M+negative+A_Here_strategy) %>%
+  filter(PandN > 0) %>%
+  .$PID
+ 
+Non_evaluativeSubj = PS_coding_analysis %>%
+  mutate(PandN = positive_M+negative+A_Here_strategy) %>%
+  filter(PandN == 0) %>%
+  .$PID
+t.test(Combined_Performance_coding$ET[Combined_Performance_coding$PID %in% evaluativeSubj], Combined_Performance_coding$ET[Combined_Performance_coding$PID %in% Non_evaluativeSubj])
+
+t.test(Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% evaluativeSubj], Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% Non_evaluativeSubj])
+
+NegativeSubj = PS_coding_analysis %>%
+  filter(negative > 0) %>%
+  .$PID
+Non_NegativeSubj = PS_coding_analysis %>%
+  filter(negative == 0) %>%
+  .$PID
+
+ t.test(Combined_Performance_coding$ET[Combined_Performance_coding$PID %in% NegativeSubj], Combined_Performance_coding$ET[Combined_Performance_coding$PID %in%Non_NegativeSubj])
+ 
+ t.test(Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% NegativeSubj], Combined_Performance_coding$EF[Combined_Performance_coding$PID %in%Non_NegativeSubj])
+ 
+ ## after recoding, the following ppts are evaluative, since they uttered something like "i'm an idiot", or "i'm better at this than i thought"
+Evaluative_full_PID <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/Data_Fall19_SONA_PS/EvaluativeSubjects.csv")
+
+Recoded_evaluativeSubj= substr(Evaluative_full_PID$PID, 2, 9)
+
+Recoded_Non_evaluativeSubj = PS_coding_analysis %>%
+  filter(!PID %in% Recoded_evaluativeSubj) %>%
+  .$PID
+
+# comparing the time in encouraging PS condition between recoded evaluative and non-evaluative,  evaluative = 117.0000, non-evaluative = 116.4727, t = 0.064579, df = 12.981, p-value = 0.9495
+t.test(Combined_Performance_coding$ET[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$ET[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+# comparing the flips in encouraging PS condition between recoded evaluative and non-evaluative,  evaluative = 93.40000, non-evaluative = 89.40741,t = 0.72292, df = 12.039, p-value = 0.4835
+t.test(Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$EF[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+
+# comparing the time in discouraging PS condition between recoded evaluative and non-evaluative,  evaluative = 130.6250, non-evaluative = 117.2909, t = 0.76305, df = 7.94, p-value = 0.4675
+t.test(Combined_Performance_coding$DT[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$DT[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+# comparing the flips in discouraging PS condition between recoded evaluative and non-evaluative, evaluative = 102.66667, non-evaluative = 93.12727, t = 1.3558, df = 10.306, p-value = 0.2041 
+t.test(Combined_Performance_coding$DF[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$DF[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+
+# comparing the difference in time between the 2 PS conditions, between recoded evaluative and non-evaluative, evaluative = -5.8571429, non-evaluative = -0.8181818,t = -0.3482, df = 7.1442, p-value = 0.7377
+t.test(Combined_Performance_coding$T_diff[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$T_diff[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+# comparing the difference in flips between the 2 PS conditions, between recoded evaluative and non-evaluative, evaluative = -6.888889, non-evaluative = -4.185185, t = -0.30072, df = 9.1741, p-value = 0.7703
+t.test(Combined_Performance_coding$F_diff[Combined_Performance_coding$PID %in% Recoded_evaluativeSubj], Combined_Performance_coding$F_diff[Combined_Performance_coding$PID %in% Recoded_Non_evaluativeSubj])
+
+### thinking about not just using the t.test, rather, using more multi-factor stuff to model regression models that clears out other influences
+ Combined_Performance_coding= Combined_Performance_coding %>% mutate(Recoded_EVA = ifelse(PID %in% Recoded_evaluativeSubj, "Evaluative", "Non-EVA"))
+
+summary(lm(data = Combined_Performance_coding, EF~ DF+ED_or_DE+`Rate (utterance/minute)`+Recoded_EVA))
+summary(lm(data = Combined_Performance_coding, DF~ EF+ED_or_DE+`Rate (utterance/minute)`+Recoded_EVA)) # this is not meaningful since the more compliant pariticipant might also do more evaluative comments, during the Discouraged conditions, they are not doing any talk, including evaluative. 
+
+summary(lm(data = Combined_Performance_coding, ET~ DT+ED_or_DE+`Rate (utterance/minute)`+Recoded_EVA))
+summary(lm(data = Combined_Performance_coding, DT ~ ET+ED_or_DE+`Rate (utterance/minute)`+Recoded_EVA)) # this is not meaningful since the more compliant pariticipant might also do more evaluative comments, during the Discouraged conditions, they are not doing any talk, including evaluative. 
+
+
+Combined_Performance_coding$A_Here_strategy[is.na(Combined_Performance_coding$A_Here_strategy)] = 0
+Combined_Performance_coding$figuringout[is.na(Combined_Performance_coding$figuringout)] = 0
+Combined_Performance_coding$relief[is.na(Combined_Performance_coding$relief)] = 0
+Combined_Performance_coding$labeling[is.na(Combined_Performance_coding$labeling)] = 0
+Combined_Performance_coding$Directions_location[is.na(Combined_Performance_coding$Directions_location)] = 0
+Combined_Performance_coding$positive_M[is.na(Combined_Performance_coding$positive_M)] = 0
+Combined_Performance_coding$negative[is.na(Combined_Performance_coding$negative)] = 0
+
+summary(lm(data = Combined_Performance_coding, ET~ DT+ED_or_DE+`Rate (utterance/minute)`+ Recoded_EVA))
+
+summary(lm(data = Combined_Performance_coding, EF~ DF+ED_or_DE+`Rate (utterance/minute)`+Recoded_EVA))
+
+
+# removing Rate and sequence, and see if being an evaluative subject affects performance, or the between-condition difference or not
+summary(lm(data = Combined_Performance_coding, ET~ DT+ Recoded_EVA))
+anova(lm(data = Combined_Performance_coding, ET~ DT*RATE), lm(data = Combined_Performance_coding, ET~ DT+RATE))
+summary(lm(data = Combined_Performance_coding, EF~ DF+Recoded_EVA))
+summary(lm(data = Combined_Performance_coding, F_diff~ Recoded_EVA))
+summary(lm(data = Combined_Performance_coding, T_diff~ Recoded_EVA))
+
+# obtaining only the complete cases for the dataset
+completeFun <- function(data, desiredCols) {
+  completeVec <- complete.cases(data[, desiredCols])
+  return(data[completeVec, ])
+}
+
+ a = completeFun(Combined_Performance_coding, c("T_diff", "F_diff","EF", "DF", "DT", "ET","Rate (utterance/minute)" ))
+
+```
+# Study 2 in the proposal
+```{r detecting outliers and analyzing ECEC performance, include = False}
+ecec_PS_performance <- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/ecec_PS_performance.csv")  
+    # col_types = cols(DOB = col_date(format = "%m/%d/%Y"), 
+     #    TIME = col_character()))
+
+highOL_time_ecec = print(ecec_PS_performance$Time[ecec_PS_performance$Time > (mean(ecec_PS_performance$Time) + 3*sd(ecec_PS_performance$Time))])
+
+lowOL_time_ecec = print(ecec_PS_performance$Time[ecec_PS_performance$Time < (mean(ecec_PS_performance$Time) - 3*sd(ecec_PS_performance$Time))])
+
+highOL_flips_ecec = print(ecec_PS_performance$Flips[ecec_PS_performance$Flips > (mean(ecec_PS_performance$Flips) + 3*sd(ecec_PS_performance$Flips))])
+
+lowOL_flips_ecec =print(ecec_PS_performance$Flips[ecec_PS_performance$Flips < (mean(ecec_PS_performance$Flips) - 3*sd(ecec_PS_performance$Flips))])
+
+ID_OL_Time_ecec = ecec_PS_performance$Name[ecec_PS_performance$Time == c(highOL_time_ecec, lowOL_time_ecec)]
+ID_OL_Flip_ecec =ecec_PS_performance$Name[ ecec_PS_performance$Flips == c(highOL_flips_ecec, lowOL_flips_ecec)]
+
+ecec_PS_performance<-ecec_PS_performance %>%
+  filter(!Name %in% c(ID_OL_Flip_ecec, ID_OL_Time_ecec))
+
+t.test(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="E"], ecec_PS_performance$Flips[ecec_PS_performance$Condition=="D"], paired = TRUE)
+
+t.test(ecec_PS_performance$Time[ecec_PS_performance$Condition=="E"], ecec_PS_performance$Time[ecec_PS_performance$Condition=="D"], paired = TRUE)
+
+FlipEffectSize_ECEC = (mean(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="E"]) - mean(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="D"]))/sqrt( (var(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="E"])+ var(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="D"]))/2 ) 
+
+TimeEffectSize_ECEC = (mean(ecec_PS_performance$Time[ecec_PS_performance$Condition=="E"]) - mean(ecec_PS_performance$Time[ecec_PS_performance$Condition=="D"]))/sqrt( (var(ecec_PS_performance$Time[ecec_PS_performance$Condition=="E"])+ var(ecec_PS_performance$Time[ecec_PS_performance$Condition=="D"]))/2 )
+
+# calculating the E to D ratio for time and taps, to later compare the manipulation differences.
+mean(ecec_PS_performance$Flips[ecec_PS_performance$Condition=="E"]/ecec_PS_performance$Flips[ecec_PS_performance$Condition=="D"])
+mean(ecec_PS_performance$Time[ecec_PS_performance$Condition=="E"]/ecec_PS_performance$Time[ecec_PS_performance$Condition=="D"])
+```
+
+# Study 2 in the proposal
+```{r ECEC_coding_excel_similar_with_adults, include=FALSE}
+library(dplyr)
+ECEC_coding <- as.data.frame( read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/ECEC_coding.csv")[, 1:10]) %>% filter(!is.na(Name))
+ECEC_coding[is.na(ECEC_coding)] <- 0
+glimpse(ECEC_coding)
+
+ECEC_coding <- ECEC_coding %>%
+  filter(!Name %in% c(ID_OL_Flip_ecec, ID_OL_Time_ecec))
+
+# Rate of kids during the Encouraged trail
+ECEC_coding_encouraged = ECEC_coding %>%
+  filter(Condition == "E")
+
+### combining the performance and the coding
+
+#combined_ecec = left_join(ecec_PS_performance, ECEC_coding, by = c("Name", "Condition") )
+
+#reshape_combined_ecec = as.data.frame(combined_ecec)
+library(dplyr)
+library(tidyr)
+
+ECEC_performance_ED_separated_flips = spread( as.data.frame(ecec_PS_performance[, -c(5, 7)]), key = Condition, value = Flips)
+
+colnames(ECEC_performance_ED_separated_flips)[colnames(ECEC_performance_ED_separated_flips) == "D"] = "DF"
+
+colnames(ECEC_performance_ED_separated_flips)[colnames(ECEC_performance_ED_separated_flips) == "E"] = "EF"
+
+ECEC_performance_ED_separated_Time= spread( as.data.frame(ecec_PS_performance[, -c(5, 8)]), key = Condition, value = Time) 
+
+colnames(ECEC_performance_ED_separated_Time)[colnames(ECEC_performance_ED_separated_Time) == "D"] = "DT"
+
+colnames(ECEC_performance_ED_separated_Time)[colnames(ECEC_performance_ED_separated_Time) == "E"] = "ET"
+
+ECEC_coding_ED_separated_E_RATE = spread( as.data.frame(ECEC_coding %>% filter(Condition =="E") ), key = Condition, value = Rate)
+
+ECEC_coding_ED_separated_D_RATE = spread( as.data.frame(ECEC_coding %>% filter(Condition =="D") ), key = Condition, value = Rate)
+
+colnames(ECEC_coding_ED_separated_E_RATE)[colnames(ECEC_coding_ED_separated_E_RATE) == "E"] = "Rate_During_Encouraged"
+
+colnames(ECEC_coding_ED_separated_D_RATE)[colnames(ECEC_coding_ED_separated_D_RATE) == "D"] = "Rate_During_Discouraged"   ## unfortunately, we only have 7 complete datapoints
+
+
+### combine the three sources (Flips and Time and Rate)
+ECEC_performance_ED_separated_performance = left_join(ECEC_performance_ED_separated_flips, ECEC_performance_ED_separated_Time, by =  c("Name", "DOB", "GENDER", "EXPERIMENTER"))
+
+ECEC_ED_separated_combined = left_join(ECEC_performance_ED_separated_performance, ECEC_coding_ED_separated_E_RATE, by =  c("Name"))
+
+ECEC_ED_separated_combined = left_join(ECEC_ED_separated_combined, ECEC_coding_ED_separated_D_RATE, by =  c("Name"))
+
+### given that the kids still talk a lot during the discouraged condition, we here use the difference between the encouraged and the discouraged condition
+
+ECEC_ED_separated_combined = ECEC_ED_separated_combined %>%
+  mutate(Rate_difference_ecec = Rate_During_Encouraged - Rate_During_Discouraged)
+
+
+### testing the models for Encouraged Rate for kids
+ECEC_TIME_MODEL = lm(data = ECEC_ED_separated_combined, ET ~ DT * Rate_During_Encouraged)
+ECEC_FLIP_MODEL = lm(data = ECEC_ED_separated_combined, EF ~ DF * Rate_During_Encouraged)
+
+summary(ECEC_TIME_MODEL)
+anova(ECEC_TIME_MODEL)
+summary(ECEC_FLIP_MODEL)
+anova(ECEC_FLIP_MODEL)
+
+names(ECEC_ED_separated_combined)[names(ECEC_ED_separated_combined) == "DF"] = "DiscouragedTaps" 
+names(ECEC_ED_separated_combined)[names(ECEC_ED_separated_combined) == "DT"] = "DiscouragedTime" 
+
+p_TapInteractionRate_Ecec =  plot_model(lm(EF ~ Rate_During_Encouraged*DiscouragedTaps , ECEC_ED_separated_combined), type = "int", mdrt.values = "meansd", title = "") +
+     ylab('Encouraged Taps')+xlab('Rate of Utterance') 
+p_TimeInteractionRate_Ecec =  plot_model(lm(EF ~ Rate_During_Encouraged*DiscouragedTime , ECEC_ED_separated_combined), type = "int", mdrt.values = "meansd", title = "") +
+     ylab('Encouraged Time')+xlab('Rate of Utterance') 
+
+
+### testing the models for the rate difference between the two conditions, and use it as a predictor
+###### Flips
+ECEC_RateDifference_MODEL_flip = lm(data = ECEC_ED_separated_combined, EF ~ DF * Rate_difference_ecec)
+summary(ECEC_RateDifference_MODEL_flip)
+anova(ECEC_RateDifference_MODEL_flip)
+
+###### Time
+
+ECEC_RateDifference_MODEL_time = lm(data = ECEC_ED_separated_combined, ET ~ DT * Rate_difference_ecec)
+summary(ECEC_RateDifference_MODEL_time)
+anova(ECEC_RateDifference_MODEL_time)
+```
+
+# Study 2 in the proposal
+```{r ECEC_plot_rate_categories, include= FALSE}
+ECEC_coding_Encouraged = ECEC_coding %>%
+  filter(Condition == "E")
+plot3 <- ggplot(ECEC_coding_Encouraged,  aes(x=Rate))+
+  geom_histogram(binwidth = 1)+
+    ggtitle('Private Speech Frequency histogram \nPreschool pilot')+
+  scale_x_continuous('Utterances Per Minuate', breaks=seq(0,50, by=5))+
+  theme_minimal()
+
+plot4 <- ggplot(ECEC_coding_Encouraged, aes(x=Rate))+
+ geom_density(fill='gray', alpha=0.5)+
+ ggtitle('Private Speech Frequency density \nPreschool pilot')+
+ scale_x_continuous('Utterances Per Minuate', breaks=seq(0,50, by=5))+
+ theme_minimal()
+gridExtra::grid.arrange(plot3, plot4, nrow=1)
+
+
+ECEC_coding_Encouraged = ECEC_coding_Encouraged %>%
+  mutate(Sum = A+P+L+N+F) %>%
+  mutate(A_percentage = A/Sum, L_Percentage = L/Sum, F_percentage = F/Sum, P_percentage = P/Sum, N_percentage = N/Sum)
+
+ECEC_coding_Encouraged[is.na(ECEC_coding_Encouraged)] <- 0
+
+
+Mean_A_ECEC = mean(ECEC_coding_Encouraged$A_percentage)#0.06658936
+Mean_F_ECEC  = mean(ECEC_coding_Encouraged$F_percentage) #0.09504584
+Mean_L_ECEC  = mean(ECEC_coding_Encouraged$L_Percentage) #0.262841
+Mean_P_ECEC  = mean(ECEC_coding_Encouraged$P_percentage)# 0.1038552
+Mean_N_ECEC  = mean(ECEC_coding_Encouraged$N_percentage) #0.1145258
+
+# plotting percentages in an alternative way:
+A_ECEC = data.frame(ECEC_coding_Encouraged$A_percentage)
+A_ECEC$type = "Acknowledge"
+P_ECEC= data.frame(ECEC_coding_Encouraged$P_percentage)
+P_ECEC$type = "Positive"
+N_ECEC = data.frame(ECEC_coding_Encouraged$N_percentage)
+N_ECEC$type = "Negative"
+L_ECEC = data.frame(ECEC_coding_Encouraged$L_Percentage)
+L_ECEC$type = "Labeling"
+F_ECEC = data.frame(ECEC_coding_Encouraged$F_percentage)
+F_ECEC$type = "FiguringOut"
+
+names(P_ECEC) = c("percentage", "type")
+names(A_ECEC) = c("percentage", "type")
+names(L_ECEC) = c("percentage", "type")
+names(N_ECEC) = c("percentage", "type")
+names(F_ECEC) = c("percentage", "type")
+total_ECEC = rbind(A_ECEC,L_ECEC, F_ECEC, P_ECEC, N_ECEC)
+
+total_ECEC$type = with(total_ECEC, reorder(type, percentage, median))
+
+Category_violin_ECEC <- total_ECEC %>%
+    ggplot( aes(x=type, y=percentage, fill=type)) + 
+    geom_violin() +
+    xlab("class") +
+    theme(legend.position="none") +
+    xlab("")
+library("forcats")
+p_ECEC_violin = total_ECEC %>%
+  mutate(type = fct_reorder(type, percentage, .fun='median')) %>%
+  ggplot( aes(x=reorder(type, percentage), y=percentage, fill=type)) + 
+    geom_violin() +
+    xlab("class") +
+    theme(legend.position="none") +
+    xlab("")
+
+p_ECEC_boxplot = total_ECEC %>%
+  mutate(type = fct_reorder(type, percentage, .fun='median')) %>%
+  ggplot( aes(x=reorder(type, percentage), y=percentage, fill=type)) + 
+  ggtitle('Private Speech Categories Frequency \nPreschool pilot')+
+    geom_boxplot() +
+    xlab("class") +
+    theme(legend.position="none") +
+    xlab("")
+
+####
+total_ECEC$type = with(total_ECEC, reorder(type,percentage, median))
+
+######
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  return(data_sum)
+}
+
+Flip_diff_df$F_diff = as.numeric(Flip_diff_df$F_diff)
+Flip_diff_df$Adult_Kid=as.factor(Flip_diff_df$Adult_Kid)
+df2 <- data_summary(Flip_diff_df, varname="F_diff", 
+                    groupnames="Adult_Kid")
+```
+
+# Study 2 in the proposal
+```{r age of kids in months, include=FALSE}
+library(lubridate)
+age <- function(dob, age.day = today(), units = "years", floor = TRUE) {
+   calc.age = interval(dob, age.day) / duration(num = 1, units = units)
+    if (floor) return(as.integer(floor(calc.age)))
+   return(calc.age)
+}
+my.dob <- as.Date(ecec_PS_performance$DOB)
+ecec_PS_performance$ageMonths = age(my.dob, units = "months")
+
+mean(ecec_PS_performance$ageMonths) # 61.42857
+sd(ecec_PS_performance$ageMonths) # 3.938683
+```
+# Study 2 in the proposal
+```{r twobytwotesing, include=FALSE}
+######### preparing for the df_time
+df_time = as.data.frame(Combined_Performance_coding[, c("ET", "DT")])
+library(reshape2)
+df_time <- cbind(ID=rownames(df_time),  df_time)
+df_time = melt(df_time)
+colnames(df_time) = c("ID", "Condition", "Time")
+
+df_time_ECEC =as.data.frame(ecec_PS_performance[, c(1,4,7)])
+colnames(df_time_ECEC) = c("ID", "Condition", "Time")
+df_time_ECEC$Adult_Kid = "Kids 4*4"
+df_time$Condition = as.character(df_time$Condition)
+df_time$Condition[df_time$Condition=="DT"] = "D"
+df_time$Condition[df_time$Condition=="ET"] = "E"
+df_time$Adult_Kid = "Adults 6*6"
+df_time_both = rbind(df_time,df_time_ECEC)
+
+########
+dat_twobytwo_time=df_time_both
+dat_twobytwo_time$Adult_Kid=as.factor(dat_twobytwo_time$Adult_Kid)
+dat_twobytwo_time$Condition=as.factor(dat_twobytwo_time$Condition)
+
+dat_twobytwo_time_df = psych::describeBy(dat_twobytwo_time$Time,list(dat_twobytwo_time$Adult_Kid,dat_twobytwo_time$Condition), mat=TRUE,digits=2) # this line and the 2 lines below are for building bar graphs, which was replaced with boxplot after reading this website: https://pagepiccinini.com/2016/02/23/boxplots-vs-barplots/
+
+limits = aes(ymax = mean + (1*se), ymin=mean - (1*se))
+
+ dodge = position_dodge(width=0.9)
+
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(family='Times'))
+
+barplot_twobytwo_time=ggplot(dat_twobytwo_time_df, aes(x = group1, y = mean, fill = group2))+
+    geom_bar(stat='identity', position=dodge)+
+   apatheme+
+   ylab('Mean Time')+xlab('Direct Age Comparison \nError Bars Indicates SEs')+ labs(fill = "Conditions")
+
+#boxplot_twobytwo_time=ggplot(dat_twobytwo_time, aes(x = Condition, y = Time, fill = Adult_Kid))+
+#    geom_boxplot()+
+#    apatheme+
+#    ylab('Time')+xlab('Direct Age Comparison')+ labs(fill = "Conditions")
+
+####################
+######### preparing for the df_flip
+df_Flips = as.data.frame(Combined_Performance_coding[1:93, c("EF", "DF")])
+library(reshape2)
+df_Flips <- cbind(ID=rownames(df_Flips),  df_Flips)
+df_Flips = melt(df_Flips)
+colnames(df_Flips) = c("ID", "Condition", "Flips")
+
+df_Flips_ECEC =as.data.frame(ecec_PS_performance[, c(1,4,8)])
+colnames(df_Flips_ECEC) = c("ID", "Condition", "Flips")
+df_Flips_ECEC$Adult_Kid = "Kids 4*4"
+df_Flips$Condition = as.character(df_Flips$Condition)
+df_Flips$Condition[df_Flips$Condition=="DF"] = "D"
+df_Flips$Condition[df_Flips$Condition=="EF"] = "E"
+df_Flips$Adult_Kid = "Adults 6*6"
+df_Flips_both = rbind(df_Flips,df_Flips_ECEC)
+
+########
+dat_twobytwo_flip=df_Flips_both
+dat_twobytwo_flip$Adult_Kid=as.factor(dat_twobytwo_flip$Adult_Kid)
+dat_twobytwo_flip$Condition=as.factor(dat_twobytwo_flip$Condition)
+
+dat_twobytwo_flip_df = psych::describeBy(dat_twobytwo_flip$Flips,list(dat_flip$Adult_Kid,dat_flip$Condition), mat=TRUE,digits=2)
+
+#### the boxplot 
+#plot_twobytwo_flips=ggplot(dat_twobytwo_flip, aes(x = Condition, y = Flips, fill = Adult_Kid))+
+#  geom_boxplot()+
+#  apatheme+
+#  ylab('Flips')+xlab('Direct Age Comparison')+ labs(fill = "Conditions")
+
+p=ggplot(dat_twobytwo_flip_df, aes(x = group1, y = mean, fill = group2))+
+     geom_bar(stat='identity', position=dodge)+
+     apatheme+
+     ylab('Mean Time')+xlab('Direct Age Comparison \nError Bars Indicates SEs')+ labs(fill = "Conditions")
+
+```
+# Study 2 in the proposal
+```{r Type 123 ANOVA for the models of interaction, include=FALSE}
+### type one two, and three ANOVA
+library(car)
+## type 1
+anova(lm(EF ~ DF * RATE, Combined_Performance_coding))
+anova(lm(ET ~ DiscouragedTime *RATE, forplot))
+anova(lm(EF ~ DF + RATE, data=Combined_Performance_coding))
+summary(lm(EF ~ DF + RATE, data=Combined_Performance_coding))
+
+
+forplot = Combined_Performance_coding
+names(forplot)[names(forplot) =="DF"] = "DiscouragedTaps"
+p_TapInteractionRate =  plot_model(lm(EF ~ RATE * DiscouragedTaps, forplot), type = "int", mdrt.values = "meansd", title = "") +
+     ylab('Encouraged Taps')+xlab('Rate of Utterance') 
+
+names(forplot)[names(forplot) =="DT"] = "DiscouragedTime"
+p_TimeInteractionRate =  plot_model(lm(ET ~ RATE * DiscouragedTime, forplot), type = "int", mdrt.values = "meansd", title = "") +
+     ylab('Encouraged Time')+xlab('Rate of Utterance') 
+
+
+ 
+ ## type 2
+Anova(lm(EF ~ DF * RATE, data=Combined_Performance_coding), type="II")
+
+
+## type 3
+car::Anova(lm(EF ~ DF * RATE, data=Combined_Performance_coding), type="III")
+
+
+### does the result change if Rate is put into the model before the DF --- no it doesn't
+Anova(lm(EF ~ RATE * DF, data=Combined_Performance_coding), type="III")
+```
+
+```{r PS_poweranalysis post hoc analysis - using the combined data, include=FALSE}
+install.packages("WebPower")
+library(WebPower)
+## correlation coefficient
+# Calculate power
+wp.correlation(r=-0.3, power = 0.8) # 83.94932 for r = -0.3, 122.3303 for r = -0.25
+# power curve
+example = wp.correlation(n=seq(50,100,10), r=0.3, alternative = "two.sided") 
+#
+plot(example,type='b')
+
+# sample size planning
+wp.correlation(n=NULL,r=0.3, power=0.8)
+
+## paired sample t-test
+wp.t(n1=NULL, d=.3, power=0.8, type='paired')
+
+## linear regression
+# power
+wp.regression(n=100, p1=2, f2=1)
+# sample size
+wp.regression(n=NULL, p1=3, p2=2, f2=0.111, power=0.8)
+
+###
+Mean_Time_E = mean(Combined_Performance_coding$ET, na.rm = T)
+
+Mean_Time_D = mean(Combined_Performance_coding$DT, na.rm = T)
+
+Mean_Flip_E = mean(Combined_Performance_coding$EF, na.rm = T)
+
+Mean_Flip_D = mean(Combined_Performance_coding$DF, na.rm = T)
+
+Pooled_SD_time = sqrt((var(Combined_Performance_coding$ET, na.rm = T)+ var(Combined_Performance_coding$DT, na.rm = T))/2)
+
+Pooled_SD_flip = sqrt((var(Combined_Performance_coding$EF, na.rm = T)+ var(Combined_Performance_coding$DF, na.rm = T))/2)
+
+d_time = (Mean_Time_E - Mean_Time_D)/Pooled_SD_time
+
+d_flip= (Mean_Flip_E - Mean_Flip_D)/Pooled_SD_flip
+
+wp.t(n1=NULL, d= d_flip, power=0.8, type='paired')
+
+wp.t(n1=NULL, d= d_time, power=0.8, type='paired')
+
+```
+
+```{r ECEC_rateAndPerformance and Gender, include=FALSE}
+# privte speech rate and performnace in Kids
+df_diff = left_join(ecec_PS_performance_d[,c(1:3, 7, 8)], ecec_PS_performance_e[, c(1:3, 7,8)])
+test =as.data.frame( PrivateSpeech_Adult_1106[1:93, c(43, 44, 46)])
+df_diff = df_diff %>%
+  mutate(T_diff = ET - DT, F_diff =EF -DF, Adult_Kid = "Kids")
+
+colnames(df_diff)[1] = colnames(ECEC_coding)[1]
+ECEC_combined = left_join(df_diff, ECEC_coding, by= "Name")
+
+summary(lm(data = ECEC_combined, T_diff ~Rate))
+summary(lm(data = ECEC_combined, ET ~DT+Rate))
+
+
+summary(lm(data = ECEC_combined, F_diff ~Rate))
+summary(lm(data = ECEC_combined, EF ~DF+Rate))
+
+ggplot(data = ECEC_combined, aes(x = DF, y = EF )) +geom_point() + geom_smooth(method = "lm", se = TRUE)
+
+ggplot(data = ECEC_combined, aes(x = DT, y = ET )) +geom_point() + geom_smooth(method = "lm", se = TRUE)
+
+
+##
+ecec_PS_performance_D = ecec_PS_performance %>%
+  filter(Condition == "D")
+colnames(ecec_PS_performance_D)[8] = "DF"
+colnames(ecec_PS_performance_D)[7] = "DT"
+ecec_PS_performance_D = as.data.frame(ecec_PS_performance_D[, c("Name", "DOB","GENDER","TRIAL","EXPERIMENTER", "DT", "DF")])
+
+##
+ecec_PS_performance_E = ecec_PS_performance %>%
+  filter(Condition == "E")
+colnames(ecec_PS_performance_E)[8] = "EF"
+colnames(ecec_PS_performance_E)[7] = "ET"
+ecec_PS_performance_E = as.data.frame(ecec_PS_performance_E[, c("Name", "DOB","GENDER","EXPERIMENTER", "ET", "EF")])
+
+## 
+transformed_ecec = as.data.frame( cbind(ecec_PS_performance_E,ecec_PS_performance_D)[, c("Name", "DOB","GENDER", "TRIAL", "EXPERIMENTER", "ET","EF", "DT", "DF")])
+transformed_ecec = transformed_ecec %>% 
+  mutate(T_diff = ET - DT, F_diff = EF - DF)
+
+## gender difference in the Flips, t = 1.1731, df = 8.3194, p-value = 0.2732, Mean X = -2.857143, Mean Y = -8.571429 
+
+t.test(transformed_ecec$F_diff[transformed_ecec$GENDER =="F"], transformed_ecec$F_diff[transformed_ecec$GENDER=="M"])
+
+## gender difference in the Time
+t.test(transformed_ecec$T_diff[transformed_ecec$GENDER =="F"], transformed_ecec$T_diff[transformed_ecec$GENDER=="M"])
+
+## does age matter
+```
+
+```{r bargraphs_kids_PS_categories, include=FALSE}
+######
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  return(data_sum)
+}
+
+ECEC_combined$percentage = as.numeric(ECEC_combined$percentage)
+ECEC_combined$type=as.factor(ECEC_combined$type)
+
+df5 <- data_summary(ECEC_combined, varname="percentage", 
+                    groupnames="type")
+# Convert xx to a factor variable
+df5$type=as.factor(df5$type)
+head(df5)
+
+### ggplot
+library(ggplot2)
+# Default bar plot
+p4 <- ggplot(df5, aes(x=type, y=percentage, fill=type)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=percentage-sd, ymax=percentage+sd), width=.2,
+                position=position_dodge(.9)) 
+print(p4)
+```
+
+```{r difference_betweenConditions_twobytwo, include=FALSE}
+df_time = as.data.frame(PrivateSpeech_Adult_1106[1:93, "T_diff"])
+
+Flips_diff = ecec_PS_performance$FLIPS[ecec_PS_performance$Condition == "D"] - ecec_PS_performance$FLIPS[ecec_PS_performance$Condition == "E"]
+
+Time_diff = ecec_PS_performance$`Time in Sec`[ecec_PS_performance$Condition == "D"] - ecec_PS_performance$`Time in Sec`[ecec_PS_performance$Condition == "E"]
+
+ecec_PS_performance_d = ecec_PS_performance %>%
+  filter(Condition == "D")
+colnames(ecec_PS_performance_d)[7:8] = c("DT", "DF")
+
+ecec_PS_performance_e = ecec_PS_performance %>%
+  filter(Condition == "E")
+colnames(ecec_PS_performance_e)[7:8] = c("ET", "EF")
+### df_diff is where the difference scores are created for the kids
+df_diff = left_join(ecec_PS_performance_d[,c(1:3, 7, 8)], ecec_PS_performance_e[, c(1:3, 7,8)])
+test =as.data.frame( PrivateSpeech_Adult_1106[1:93, c(43, 44, 46)])
+df_diff = df_diff %>%
+  mutate(T_diff = ET - DT, F_diff =EF -DF, Adult_Kid = "Kids" )
+
+test = test %>% 
+  mutate(Adult_Kid = "Adults")
+
+Flip_diff_df = rbind( test[, 3:4], df_diff[, 9:10])
+
+Flip_diff_df = Flip_diff_df[complete.cases(Flip_diff_df),]
+
+######
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  return(data_sum)
+}
+
+Flip_diff_df$F_diff = as.numeric(Flip_diff_df$F_diff)
+Flip_diff_df$Adult_Kid=as.factor(Flip_diff_df$Adult_Kid)
+df2 <- data_summary(Flip_diff_df, varname="F_diff", 
+                    groupnames="Adult_Kid")
+# Convert xx to a factor variable
+df2$Adult_Kid=as.factor(df2$Adult_Kid)
+head(df2)
+
+### ggplot
+library(ggplot2)
+# Default bar plot
+p<- ggplot(df2, aes(x=Adult_Kid, y=F_diff, fill=Adult_Kid)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=F_diff-sd, ymax=F_diff+sd), width=.2,
+                position=position_dodge(.9)) 
+print(p)
+
+
+## time 
+test_Time =as.data.frame( PrivateSpeech_Adult_1106[1:93, c(41, 42, 45)])
+test_Time$Adult_Kid = "Adults"
+Time_diff_df = rbind( test_Time[, 3:4], df_diff[, c(8,10)])
+
+Time_diff_df =  Time_diff_df[complete.cases(Time_diff_df),]
+
+
+Time_diff_df$T_diff = as.numeric(Time_diff_df$T_diff)
+Time_diff_df$Adult_Kid=as.factor(Time_diff_df$Adult_Kid)
+df3 <- data_summary(Time_diff_df, varname="T_diff", 
+                    groupnames="Adult_Kid")
+# Convert xx to a factor variable
+df3$Adult_Kid=as.factor(df3$Adult_Kid)
+head(df3)
+
+### ggplot
+library(ggplot2)
+# Default bar plot
+p2<- ggplot(df3, aes(x=Adult_Kid, y=T_diff, fill=Adult_Kid)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=T_diff-sd, ymax=T_diff+sd), width=.2,
+                position=position_dodge(.9)) 
+print(p2)
+```
+
+```{r ForReplyErik, include=FALSE}
+
+ggplot(Combined_Performance_coding) + 
+  geom_point(aes(x = `Rate (utterance/minute)`, y = EF), size = .8, colour = "blue") +
+  geom_smooth(aes(x= `Rate (utterance/minute)`, y = EF), size = 1, colour = "blue", se = TRUE, stat = "smooth", method = "lm") +
+  geom_point(aes(x = `Rate (utterance/minute)`, y = DF), size = .8, colour = "red") +
+  geom_smooth( aes(x = `Rate (utterance/minute)`, y = DF), size = 1, 
+              colour = "red", se = TRUE, stat = "smooth", method = "lm") + theme(axis.title.x = element_text(colour = "black"),
+                                                                                 axis.title.y = element_text(colour = "blue"))
+
+ggplot(Combined_Performance_coding) + 
+  geom_point(aes(x = `Rate (utterance/minute)`, y = F_diff), size = .8, colour = "purple") +
+  geom_smooth(aes(x= `Rate (utterance/minute)`, y = F_diff), size = 1, colour = "purple", se = TRUE, stat = "smooth", method = "lm")
+ 
+
+
+ggplot(Combined_Performance_coding) + 
+  geom_point(aes(x = `Rate (utterance/minute)`, y = EF - DF), size = .8, colour = "purple") +
+  geom_smooth(aes(x= `Rate (utterance/minute)`, y = EF - DF), size = 1, colour = "purple", se = TRUE, stat = "smooth", method = "lm")
+
+
+
+ggplot(data = PrivateSpeech_Adult_1106, aes(x = DF, y = EF )) +geom_point() + geom_smooth(method = "lm", se = TRUE)
+
+ggplot(data = PrivateSpeech_Adult_1106, aes(x = DT, y = ET )) +geom_point() + geom_smooth(method = "lm", se = TRUE)
+
+
+
+ggplot(PrivateSpeech_Adult_1106, aes(x = PID, y = F_diff)) + geom_point(colour = "purple")+
+    theme(axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())+
+    labs(y="EF - DF", x = "Participants")
+
+NullModel <- lmer(data=Combined_Performance_coding, EF~ 1+ DF
+                     + (1|PID))
+ModelwithRate <- lmer(data=Combined_Performance_coding,  EF~ 1+DF+`Rate (utterance/minute)`
+                      + (1|PID))
+
+anova(NullModel, ModelwithRate)
+```
+
+```{r FourConditions file and correcting the cells, include=FALSE}
+# including the dataset of 
+PS_4Conditions_SONA_Win20<- read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/PS_4Conditions_SONA_Win20.csv")
+
+### the current file is hms, should divide it by 60 to get minute and second
+PS_4Conditions_SONA_Win20 = PS_4Conditions_SONA_Win20  %>%
+  mutate(Time = TimeInSecond/60)
+t.test(PS_4Conditions_SONA_Win20$Time[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="D"], PS_4Conditions_SONA_Win20$Time[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="E"], paired = TRUE)
+
+
+
+t.test(PS_4Conditions_SONA_Win20$Flips[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="D"], PS_4Conditions_SONA_Win20$Flips[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="E"], paired = TRUE)
+
+t.test(PS_4Conditions_SONA_Win20$Flips[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="N" & PS_4Conditions_SONA_Win20$`SEQUIENCE (1_4)` =="4"], PS_4Conditions_SONA_Win20$Flips[PS_4Conditions_SONA_Win20$CONDITION_N_D_E =="E"], paired = TRUE)
+
+```
+
+```{r simulation, include=FALSE}
+# Take these vectors as input to the array.
+vector = c("a", "a", "b", "b", "c", "c", "d","d")
+result <- array(vector,dim = c(4,2))
+print(result)
+pairs =sample(result, 2, replace = T)
+if pairs[1] == pairs[2],result = result[-pairs] else
+  
+## randomly sample 100 cards from 2 by 4 array
+n = 4
+N = n*2
+set.seed(2)
+times=3
+m=matrix(nrow=times, ncol=N)
+for (i in 1:times){
+  m[i,]=sample(1:N, 2, replace=T)
+}
+m
+########### blow from website
+times=10000
+set.seed(2)
+results=vector(length=times)
+cor.coefs=vector(length=times)
+for(i in 1:times){
+  r1=rnorm(100)
+  r2=rnorm(100)
+  test=cor.test(r1,r2)
+  p=test$p.value
+  results[i]=p<=0.05
+}
+sum(results+0)
+```
+
+```{r include the easiness to be labelled, include=FALSE}
+EasinessLabel = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/HEAL - Help us find out how namable the stimuli are!_March 10, 2020_22.23.csv")
+Numeric_EasinessLabel = EasinessLabel[sapply(EasinessLabel, class) == "numeric" ]
+
+testing = Numeric_EasinessLabel %>%
+     summarise_each(funs(sd(., na.rm=TRUE)))
+View(testing)
+## transpose the dataframe 
+SD_labels = as.data.frame(t(testing))
+
+## combined the sd score with the mean based on the rowname
+rbind(SD_labels, Numeric_EasinessLabel,by ="")
+
+
+Text_EasinessLabel = EasinessLabel[sapply(EasinessLabel, class) == "character" ]
+
+Numeric_EasinessLabel_separated = separate(data = as.data.frame(summary(Numeric_EasinessLabel)), col = Freq, into = c("function", "value"), sep = "\\:")
+
+EasinessLabel_Mean = Numeric_EasinessLabel_separated %>%
+  filter(`function` == "Mean   ")
+
+clustered_EasinessLabel = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/clustered_EasinessLabel.csv")
+
+## function, 1.table the respective colomn; 2. make the table result into dataframe; 3. extract the number of rows 3. attach the number of rows to the dataset
+
+completeFun <- function(DataFrame, Colnames) {
+  #completeVec <- complete.cases(data[, desiredCols])
+  nrow(data.frame(table(DataFrame$Colnames)))
+  return(data[completeVec, ])
+}
+
+clustered_EasinessLabel %>%
+  $. %>%
+  table()
+```
