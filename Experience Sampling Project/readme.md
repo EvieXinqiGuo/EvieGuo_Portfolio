@@ -26,3 +26,6 @@
 ### Approach of reporting
 - Significance test of model comparison (a full model vs. a lesion model without the effect of interest)
 - Partial eta-square
+
+
+# A more detailed and formal report of the project. Can be found in the second half of the PDF report ![here](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/Experience%20Sampling%20Project%20Walk%20Through.pdf)  
