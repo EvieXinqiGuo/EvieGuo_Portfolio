@@ -21,11 +21,11 @@
 
 ## Models used
 * A linear regression model was created first. The model does well in keeping the overall late delivary within 15%, and the very-late (over 5 minutes) deliveries is around 6.9%. But the RMSE score is high - 1672.92. Note: Overall lateness is defined as the proportion of late delivery, which ranges from very late (over 10 min) to about on time (late within 5 min).
-![Table Evaluation Linear Regression Model EarlyLate Category](https://rpubs.com/guoxinqi1995/ErrorEvaluationLinearRegressionModelEarlyLateCategory)
+![]()
 * A mixed effect model with the store_id as random effects (meaning that we can later take these irrelevant clustering effect out to make our estimation of the meaningful variables more accurate). The mixed effect model outperformed the linear regression on both the RMSE (1627.13) and the lateness (very late: 6.3%, overall lateness: 14.1%). 
-![](https://drive.google.com/file/d/1WaOKnBAjgj2J3-8Uh27Gwq5oI-hEbhA-/view?usp=sharing)
+![]()
 * A XGBoost model also performs well with a low "very late" (6.8%) delivery and slightly higher overal lateness (14.9%) than the mixed effect model . Although the cross validation RMSE of the XGBoost model (1478.721) is much lower.
-![](https://rpubs.com/guoxinqi1995/ErrorEvaluationXGBoostModelEarlyLateCategory)
+![]()
 
 * As those the XGBoost and the mixed effect model are very different, averaging predictions is likely to improve the predictions. In the prediction for submission, I averaged the prediction between the XGBoost model and the mixed effect model, with higher weight given to the XGBoost model.
 
