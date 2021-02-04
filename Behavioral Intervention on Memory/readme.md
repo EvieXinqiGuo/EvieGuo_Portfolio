@@ -3,6 +3,7 @@
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/innerspeechimage.png)
 
 If you randomly tap on someone’s shoulder and ask what were you thinking just now, it’s highly probable that she’d say, “I was just talking to myself up in my head”. Evidence shows this form of internal self-directed talk takes around a fourth of adults’ conscious time. Interestingly, we sometimes talk to ourselves out loud. Researchers call the silent self-talk “inner speech”, and out-loud self-talk “private speech”. As a researcher, I’m interested in what does private speech do to us, and why is it still there for adults. 
+
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/selfTalkStages.png)
 
 My interests in private speech started out of this behavior in children. My qualification paper was a literature review on the past decade’s private speech studies. Private speech in childhood is really common to observe and has been studied quite extensively. It has been linked with, autobiographical memory, planning performance, emotion regulation, etc. However, the takeaway of what I learn about the field that the cognitive influence of private speech in children is not as established as it seems.
