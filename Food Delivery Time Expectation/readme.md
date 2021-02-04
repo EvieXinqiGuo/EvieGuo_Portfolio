@@ -25,7 +25,7 @@
 * A mixed effect model with the store_id as random effects (meaning that we can later take these irrelevant clustering effect out to make our estimation of the meaningful variables more accurate). The mixed effect model outperformed the linear regression on both the RMSE (1627.13) and the lateness (very late: 6.3%, overall lateness: 14.1%). 
 ![]()
 * A XGBoost model also performs well with a low "very late" (6.8%) delivery and slightly higher overal lateness (14.9%) than the mixed effect model . Although the cross validation RMSE of the XGBoost model (1478.721) is much lower.
-![]()
+![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Food%20Delivery%20Time%20Expectation/Error%20Evaluation%20XGBoost%20Model%20Early%20Late%20Category.png)
 
 * As those the XGBoost and the mixed effect model are very different, averaging predictions is likely to improve the predictions. In the prediction for submission, I averaged the prediction between the XGBoost model and the mixed effect model, with higher weight given to the XGBoost model.
 
