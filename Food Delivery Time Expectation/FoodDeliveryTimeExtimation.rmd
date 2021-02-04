@@ -1,5 +1,5 @@
 ---
-title: "Food Delivery Duration Prediction"
+title: "DoorDash Take-Home Exercise - Delivery Duration Prediction"
 author: "Evie Xinqi Guo"
 output:
   html_document:
@@ -21,12 +21,12 @@ knitr::opts_chunk$set(echo=F,
                       tidy=TRUE)
 ```
 # Overview of the challenge
-![](https://memegenerator.net/instance/59804661/kermit-looking-out-the-window-delivery-status-out-for-delivery) 
-# Background
-# A food delivery company connects consumers with their favorite resturants through machine-learning-backed service. Once the order arrives late, the convinence due to delivery now becomes frustration.
+![](https://ahseeit.com//king-include/uploads/2019/02/50775485_137073873988501_8263291442820303042_n-7723924764.jpg) 
+
+# DoorDash connects consumers with their favorite resturants through machine-learning-backed service. Once the order arrives late, the convinence due to delivery now becomes frustration.
 # To ensure that the prediction of delivery time closely reflects the actual delivery time, information from the three sides involved - the store, the dashers' capacity, and the consumer's order - all needs to be taken into consideration.
 # Conceptually, the estimated delivery duration after the customer placing an order can be divided into these components (it's not necessarily a chain of events since some can be done in paralell): 
-- The time that a store takes to receive an order from the company
+- The time that a store takes to receive an order from DoorDash
 - The time for a store to repare for an order
 - Assigning the order to the right dasher
 - The dasher travels to the store
@@ -41,7 +41,7 @@ knitr::opts_chunk$set(echo=F,
 ## Models used
 * A linear regression model was created first. The model does well in keeping the overall late delivary within 15%, and the very-late (over 5 minutes) deliveries is around 6.9%. But the RMSE score is high - 1672.92. Note: Overall lateness is defined as the proportion of late delivery, which ranges from very late (over 10 min) to about on time (late within 5 min).
 * A mixed effect model with the store_id as random effects (meaning that we can later take these irrelevant clustering effect out to make our estimation of the meaningful variables more accurate). The mixed effect model outperformed the linear regression on both the RMSE (1627.13) and the lateness (very late: 6.3%, overall lateness: 14.1%). 
-* A XGBoost model also performs well but with a higher "very late" (7.1%) delivery and slightly higher overal lateness (15.2%) than the mixed effect model . Although the cross validation RMSE of the XGBoost model (1469.54) is much lower.
+* A XGBoost model also performs well with a low "very late" (6.8%) delivery and slightly higher overal lateness (14.9%) than the mixed effect model . Although the cross validation RMSE of the XGBoost model (1478.721) is much lower.
 * As those the XGBoost and the mixed effect model are very different, averaging predictions is likely to improve the predictions. In the prediction for submission, I averaged the prediction between the XGBoost model and the mixed effect model, with higher weight given to the XGBoost model.
 
 # Introduction and potential NEW features to add
@@ -89,13 +89,21 @@ library(lme4)
 library(merTools)
 library(mice)
 library(lubridate)
+
+
+library(apa)
+library(citr)
+library(papaja)
+library(MOTE)
+library(tidyverse)
+library(kableExtra)
 ```
 
 Below, I am reading the csv's as dataframes into R.
 
 ```{r importing datasets}
-train_raw = read_csv("...")
-test_raw =  read_csv("...")
+train_raw = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/historical_data.csv")
+test_raw =  read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/predict_data.csv")
 ```
 
 #Pre-processing - data exploration, recoding, and cleaning
@@ -153,7 +161,7 @@ summary(train$actual_delivery_time) # actual_delivery_time has 7 NAs, other than
 table(train$store_primary_category) # some categories are much more popular than the others.
 
 
-# looking at the distribution of the means of how stores accpet an order from the delivery company's system
+# looking at the distribution of the means of how stores accpet DoorDash order
 table(train$order_protocol) # order_protocol has a lot of NAs, ranges from 1 to 7, are distinct, some are much more popular than others
 summary(train$order_protocol)
 
@@ -289,7 +297,21 @@ ErrorEvaluation_lm = data.frame(lm_error = lm_error,
                                                                 lm_error <= - 10*60 ~ "Early more than 10 Min"
                                                                 ) ) 
 ## looking at the distribution of the early and late category, there are currently 
-prop.table(table(ErrorEvaluation_lm$EarlyLateCategory))
+
+ErrorEvaluation_lm_EarlyLateCategory = as.data.frame(prop.table(table(ErrorEvaluation_lm$EarlyLateCategory)))
+
+colnames(ErrorEvaluation_lm_EarlyLateCategory) = c("Early Late Category", "Frequency")
+
+level_category <- c("Early more than 10 Min", "Early 5-10 Min", "Early within 5 Min", "Late within 5 Min",  "Late 5-10 Min","Late Over 10 Min")
+
+ErrorEvaluation_lm_EarlyLateCategory = ErrorEvaluation_lm_EarlyLateCategory %>%
+  mutate(`Early Late Category`=  factor(`Early Late Category`, levels = level_category)) %>%
+  arrange(`Early Late Category`)
+
+table_ErrorEvaluation_lm_EarlyLateCategory =ErrorEvaluation_lm_EarlyLateCategory %>%
+  knitr::kable(digits = 3, caption = "Error Evaluation Linear Regression Model Early Late Category") %>%
+  kableExtra::kable_styling(latex_options = "scale_down")
+
 
 # the simple linear model also does well in having an overall lateness of 14.93%. But its very late category (6.9%) is higher than the mixed effect model prediction (below)
 
@@ -312,6 +334,29 @@ ErrorEvaluation_lmer = data.frame(lmer_error = lmer_error,
                                                                 ) )
 prop.table(table(ErrorEvaluation_lmer$EarlyLateCategory)) # The vast majority of the delivery is early under this model, the overall lateness is 14.1%. The the very (over 10 min) late category is around 6.3% percent
 
+
+ErrorEvaluation_lmixed_EarlyLateCategory = as.data.frame(prop.table(table(ErrorEvaluation_lmer$EarlyLateCategory)))
+
+colnames(ErrorEvaluation_lmixed_EarlyLateCategory) = c("Early Late Category", "Frequency")
+
+level_category <- c("Early more than 10 Min", "Early 5-10 Min", "Early within 5 Min", "Late within 5 Min",  "Late 5-10 Min","Late Over 10 Min")
+
+ErrorEvaluation_lmixed_EarlyLateCategory = ErrorEvaluation_lmixed_EarlyLateCategory %>%
+  mutate(`Early Late Category`=  factor(`Early Late Category`, levels = level_category)) %>%
+  arrange(`Early Late Category`)
+
+table_ErrorEvaluation_lmixed_EarlyLateCategory =ErrorEvaluation_lmixed_EarlyLateCategory %>%
+  knitr::kable(digits = 3, caption = "Error Evaluation Linear MIXED Model Early Late Category") %>%
+  kableExtra::kable_styling(latex_options = "scale_down")
+
+```
+
+```{r TableEarlyLateLM, echo=FALSE}  
+  table_ErrorEvaluation_lm_EarlyLateCategory
+```
+
+```{r TableEarlyLateLMixed, echo=FALSE}  
+  table_ErrorEvaluation_lmixed_EarlyLateCategory
 ```
 
 ## The third prediction model for consideration is a XGBoost model
@@ -380,27 +425,29 @@ default_param<-list(
 
 "The next step is to do cross validation to determine the best number of rounds (for the given set of parameters)." 
 ```{r XGBoost Cross Validation}
+set.seed(100)
 xgbcv <- xgb.cv( params = default_param, data = dtrain, nrounds = 500, nfold = 7, showsd = T, stratified = T, print_every_n = 50, early_stopping_rounds = 10, maximize = F)
 
-#[1]	train-rmse:2578.890137+84.598022	test-rmse:2537.935268+465.720142 
+#[1]	train-rmse:2578.948591+82.418023	test-rmse:2540.076835+453.918489 
 #Multiple eval metrics are present. Will use test_rmse for early stopping.
 #Will train until test_rmse hasn't improved in 10 rounds.
 
-#[51]	train-rmse:1687.301950+128.015835	test-rmse:1573.225429+671.621499 
-#[101]	train-rmse:1600.194388+129.540608	test-rmse:1496.934675+693.282073 
-#[151]	train-rmse:1579.874058+126.942143	test-rmse:1484.525033+696.186054 
-#[201]	train-rmse:1564.091099+124.994143	test-rmse:1478.678798+696.898364 
-#[251]	train-rmse:1552.045672+123.808994	test-rmse:1474.111668+697.793351 
-#[301]	train-rmse:1542.158378+122.695016	test-rmse:1471.921308+697.814012 
-#[351]	train-rmse:1534.593018+121.302146	test-rmse:1470.022653+697.912032 
+#[51]	train-rmse:1689.529698+121.945481	test-rmse:1581.529367+651.528071 
+#[101]	train-rmse:1600.293596+120.399810	test-rmse:1506.473179+671.641646 
+#[151]	train-rmse:1579.996565+119.180641	test-rmse:1494.741926+674.094247 
+#[201]	train-rmse:1563.757132+117.390876	test-rmse:1490.016200+674.652216 
+#[251]	train-rmse:1550.746966+114.153220	test-rmse:1485.470319+675.604640 
+#[301]	train-rmse:1540.295776+112.428664	test-rmse:1483.263802+675.638323 
+#[351]	train-rmse:1532.593663+112.149902	test-rmse:1481.385594+675.840846 
+#[401]	train-rmse:1525.220895+110.456893	test-rmse:1480.015119+676.033333 
+#[451]	train-rmse:1519.397914+109.869758	test-rmse:1478.765102+676.181584 
 #Stopping. Best iteration:
-#[346]	train-rmse:1535.953980+121.766263	test-rmse:1469.535540+698.321394
-
+#[442]	train-rmse:1520.736834+110.449768	test-rmse:1478.721776+676.307824
 ```
 
 ```{r train model with best iteration}
 #train the model using the best iteration found by cross validation
-xgb_mod <- xgb.train(data = dtrain, params=default_param, nrounds = 346)
+xgb_mod <- xgb.train(data = dtrain, params=default_param, nrounds = 442)
 ```
 
 ```{r XGBoost Prediction}
@@ -409,7 +456,7 @@ XGBpred <- predict(xgb_mod, dtest)
 head(XGBpred)
 ```
 
-After obtaining the RMSE score, I use the pre-constructed early/late category to evaluate the XGBoost model. As presented below, the result shows that this model is by large overestimating the delivery time, which is less evil than underestimating the delivery time. However, its percentage of being very (over 10 min) early is concerning.
+After obtaining the RMSE score, I use the pre-constructed early/late category to evaluate the XGBoost model. As presented below, the result shows that this model is by large overestimating the delivery time, which is less evil than underestimating the delivery time. However, its percentage of being very (over 10 min) early ranks between the linear regression and the linear mixed effect model.
 ```{r xgboost earlyLateCategory}
 xgboost_error = TestingSet$diff_actual_estimate_sec- (round(XGBpred) + TestingSet$estimated_order_place_duration + TestingSet$estimated_store_to_consumer_driving_duration) 
 xgboostErrorEvaluation = data.frame(xgboost_error = xgboost_error,
@@ -428,7 +475,28 @@ prop.table(table(xgboostErrorEvaluation$EarlyLateCategory))
 #            0.09628234             0.68098468             0.07050992             0.03323286             0.07113791 
 #     Late within 5 Min 
  #           0.04785230 
+
+
+ErrorEvaluation_xgboost_EarlyLateCategory = as.data.frame(prop.table(table(xgboostErrorEvaluation$EarlyLateCategory)) )
+
+colnames(ErrorEvaluation_xgboost_EarlyLateCategory) = c("Early Late Category", "Frequency")
+
+level_category <- c("Early more than 10 Min", "Early 5-10 Min", "Early within 5 Min", "Late within 5 Min",  "Late 5-10 Min","Late Over 10 Min")
+
+ErrorEvaluation_xgboost_EarlyLateCategory = ErrorEvaluation_xgboost_EarlyLateCategory %>%
+  mutate(`Early Late Category`=  factor(`Early Late Category`, levels = level_category)) %>%
+  arrange(`Early Late Category`)
+
+table_ErrorEvaluation_xgboost_EarlyLateCategory =ErrorEvaluation_xgboost_EarlyLateCategory %>%
+  knitr::kable(digits = 3, caption = "Error Evaluation XGBoost Model Early Late Category") %>%
+  kableExtra::kable_styling(latex_options = "scale_down")
+
 ```
+
+```{r TableEarlyLateXGBoost, echo=FALSE}  
+  table_ErrorEvaluation_xgboost_EarlyLateCategory
+```
+
 
 ## By evaluating the RMSE and lateness category of the XGBoost model, I found out that the XGBoost's RMSE score is much better than the linear regression and mixed effect models. However, the mixed effect model has lower "very late" delivery than the XGBoost model. Thus, in the submission, I average the XGBoost and the mixed effect model prediction, with a heavier weight given to the XGBoost model.
 ```{r submission}
@@ -456,10 +524,6 @@ head(XGB_pred_submmit)
 sub_avg <- data.frame(delivery_id = test$delivery_id, 'predicted duration' = (2*XGB_pred_submmit+predict(lmer_model,newdata=test,  allow.new.levels=TRUE))/3)
 head(sub_avg)
 
-write.csv(sub_avg,"...", row.names = F)
+write.csv(sub_avg,"/Users/guoxinqieve/Applications/OneDrive - UC San Diego/DD_takeHomeExercise/XinqiGuo_DoorDashSubmission.csv", row.names = F)
 
 ```
-
-
-
-
