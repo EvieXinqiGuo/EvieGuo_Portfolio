@@ -4,6 +4,6 @@
 
 ## [Project 1: Food Delivery Time Estimation. Mixed effect model and XGBoost model comparison](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Food%20Delivery%20Time%20Expectation/readme.md)
 
-## [Project 2: Original Data - Experience Sampling Method Project on Momentary Well-being. Exploratory and confirmatory data analysis](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/ExperienceSamplingProject.Rmd)
+## [Project 2: Original Data - Experience Sampling Method Project on Momentary Well-being. Exploratory and confirmatory data analysis](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/tree/main/Experience%20Sampling%20Project)
 
 ## [Project 3: Original Data - Behavioral Testing. Behavioral Intervention on Memory Performance](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/BehavioralInterventionOnMemory.Rmd)
