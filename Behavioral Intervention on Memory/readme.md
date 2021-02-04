@@ -38,10 +38,13 @@ Each participant was asked to play the game twice, and the sequence of private s
 The card patterns were emojis, and their locations and patterns were randomized by the iPad after each trial was finished.
 
 What we found was, First, neither populations’ time to finish the trial was changed significantly by the private speech manipulation. So an average participant took similar amount of time to finish collecting the matching pairs when using private speech or quiet. 
+
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/TwoByTwoAgeComaparison_Time.png)
 
 However, we found that both populations used fewer taps to finish when they were asked to think aloud as much as they can during the game than when they were asked to keep quiet. This means that private speech reduces memory error. 
+
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/TwoByTwoAgeComaparison_Flip.png)
+
 Based on the effect size, private speech seems to have a larger benefit on children than adults, but note that the Discouraged condition has an inhibitory nature for preschoolers since it is established in the literature that kids use private speech naturally. A neutral group for preschoolers, where no speech instruction is provided, will be added to the future research design to remedy this issue. 
 
 
@@ -52,13 +55,17 @@ Rate of private speech is a significant predictor for encouraged taps on top of 
 What about the interaction between rate and the discouraged performance, does the effect of rate depends on how well they did during the discouraged performance? 
 
 For number of taps, there’s no significant interaction. No matter how well you did during the discouraged condition, the higher the rate, the fewer errors were made. 
+
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/EF_Rate_control_DifferentDF_Plot.png?raw=true)
 
 For time, there is an interaction between rate and discouraged performance. So, the slope of rate on encouraged performance different across people with different discouraged performances. Specifically, for those who did well in the discouraged performance, the more people talk, the longer it takes them to finish, but for those did not do well in the discouraged performance, the faster they are to finish. 
+
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/ET_Rate_control_DifferentDT_Plot.png)
 
 If we look into the content of both participants’ private speech, and group them into predesigned categories, we will find that, more than half of an average adult participant’s private speech was about labeling the stimuli. But for kids, based on the current sample, they labeled the stimuli to a less extent
+
 ![Adult Self-talk Content Distribution](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/PS_categories.png?raw=true)
+
 ![Kids Self-Talk Content Distribution](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/PS_CategoriesECEC.png?raw=true)
 
 
