@@ -2,7 +2,7 @@
 
  
 # Overview of the challenge
-![](https://ahseeit.com//king-include/uploads/2019/02/50775485_137073873988501_8263291442820303042_n-7723924764.jpg, width = 100) 
+![](https://ahseeit.com//king-include/uploads/2019/02/50775485_137073873988501_8263291442820303042_n-7723924764.jpg) 
 
 # Food Delivery company connects consumers with their favorite resturants through machine-learning-backed service. Once the order arrives late, the convinence due to delivery now becomes frustration.
 # To ensure that the prediction of delivery time closely reflects the actual delivery time, information from the three sides involved - the store, the dashers' capacity, and the consumer's order - all needs to be taken into consideration.
