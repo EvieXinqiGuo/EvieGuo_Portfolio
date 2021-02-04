@@ -38,7 +38,7 @@
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/ActivityWellbeing.png)
 ###### 5.3.2) Visualize the range of well-being as a function of attention state 
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/AttentionWellbeing.png)
-###### 5.3.3) Does attention state contribute to well-being over-and-beyond the pleasantness of thought? - Yes!
+###### 5.3.3) Does attention state contribute to well-being over-and-beyond the pleasantness of thought? - Yes!  Further, there is no meaningful interaction between attention state and valence when predicting well-being
 ![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/AttentionValenceInteract.png)
 
 
