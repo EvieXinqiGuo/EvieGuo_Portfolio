@@ -55,7 +55,7 @@ For time, there is an interaction between rate and discouraged performance. So, 
 
 If we look into the content of both participants’ private speech, and group them into predesigned categories, we will find that, more than half of an average adult participant’s private speech was about labeling the stimuli. But for kids, based on the current sample, they labeled the stimuli to a less extent
 ![Adult Self-talk Content Distribution](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/PS_categories.png?raw=true)
-![Kids Self-Talk Content Distribution](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/PS_Frequency_ECEC.png)
+![Kids Self-Talk Content Distribution](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Behavioral%20Intervention%20on%20Memory/PS_CategoriesECEC.png?raw=true)
 
 
 Since preliminary data shows that encouraging adults and preschoolers to use private speech during the Concentration game reduces their memory errors compared with keeping quiet, the plan for the near future is to develop experiments to investigate the mechanism of this benefit more rigorously. 
