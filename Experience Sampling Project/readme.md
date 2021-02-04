@@ -27,5 +27,19 @@
 - Significance test of model comparison (a full model vs. a lesion model without the effect of interest)
 - Partial eta-square
 
+## 5) Results
+
+#### Descriptive findings: 
+
+##### 5.1) How often do we pay attention to the here-and-now, not attending to the here-and-now, versus no thoughts at all during waking time? - More than half of our waking time are at-present, phew!
+![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/AttentionDistribution.png)
+
+##### 5.2) If we are interested in the modalities of thought, we can further distribute the prompts based on attention state and modality. We can zoom in to focus on one modality (in this case, verbal thoughts) if that would deepen our understanding of something more specific. 
+![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/ActivityWellbeing.png)
+###### 5.3.2) Visualize the range of well-being as a function of attention state 
+![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/AttentionWellbeing.png)
+###### 5.3.3) Does attention state contribute to well-being over-and-beyond the pleasantness of thought? - Yes!
+![](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/AttentionValenceInteract.png)
+
 
 # A more detailed and formal report of the project. Can be found in the second half of the PDF report [here](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/Experience%20Sampling%20Project/Experience%20Sampling%20Project%20Walk%20Through.pdf)  
