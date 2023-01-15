@@ -4,7 +4,7 @@
 
 ## [Project 1:Code Review for Social Science Forecasting Collaborative in R for Research Reproducibility](https://eviexinqiguo.github.io/2023/01/09/code-review.html)
 
-## [Project 2: Original Data - Experience Sampling Method Project on Momentary Well-being. Exploratory and confirmatory data analysis](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/tree/main/Experience%20Sampling%20Project)
+## [Project 2: Original Data - Experience Sampling Method Project on Mindfulness and Momentary Well-being. Exploratory and confirmatory data analysis](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/tree/main/Experience%20Sampling%20Project)
 
 ## [Project 3: Original Data - Behavioral Testing. Behavioral Intervention on Memory Performance](https://github.com/EvieXinqiGuo/EvieXinqiGuo_Portfolio/blob/main/BehavioralInterventionOnMemory.Rmd)
 
